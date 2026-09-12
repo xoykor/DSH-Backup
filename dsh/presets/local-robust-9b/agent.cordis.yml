@@ -55,7 +55,7 @@
 - id: agent-instructions
   name: '@deepseek-ai/dsh-agent-instructions'
   config:
-    maxBytes: 65536
+    maxBytes: 131072
 
 # ── shell ───────────────────────────────────────────────────────────────────
 
@@ -176,16 +176,16 @@
       config:
         auto: true
         thresholdRatio: 0.72
-        retainTokens: 16000
-        maxTokens: 8192
+        retainTokens: 32000
+        maxTokens: 16384
         compactionRetries: 1
         maxOverflowRetries: 1
         modelPolicies:
           - provider: lmstudio
-            model: qwen3.8-27b-gsq-rco
+            model: ornith-1.5-9b
             thresholdRatio: 0.72
-            retainTokens: 16000
-            maxTokens: 8192
+            retainTokens: 32000
+            maxTokens: 16384
             compactionRetries: 1
             maxOverflowRetries: 1
 
@@ -195,9 +195,9 @@
     - id: tool-result-pruner
       name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
       config:
-        thresholdChars: 6000
-        headChars: 3000
-        tailChars: 1000
+        thresholdChars: 12000
+        headChars: 6000
+        tailChars: 2000
 
 # ── delegation and workflows ────────────────────────────────────────────────
 

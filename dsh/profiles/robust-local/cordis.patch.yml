@@ -1,4 +1,21 @@
 # Isolated robust-local host policy. This layer does not affect other profiles.
+- id: context-guard
+  config:
+    economyTokens: 131072
+    checkpointTokens: 163840
+    compactTokens: 188743
+    noProgressLimit: 3
+    equivalentBlockLimit: 5
+    maxTurnSteps: 48
+    maxTurnToolCalls: 48
+    maxTurnMs: 900000
+    maxTurnTokens: 240000
+    diagnosticMaxCalls: 3
+    diagnosticMaxMs: 120000
+    diagnosticMaxTokens: 24000
+    textSimilarity: 0.94
+    resultFingerprintChars: 8000
+
 - id: settings
   config:
     path: __DSH_HOME__/profiles/robust-local/settings.yaml
@@ -19,15 +36,15 @@
     - id: goal-verified
       name: __DSH_HOME__/plugins/dsh-goal-verification/lib/index.js
       config:
-        defaultMaxGoalRounds: 24
+        defaultMaxGoalRounds: 48
 
     - id: verification
       name: __DSH_HOME__/plugins/dsh-verification/packages/dsh-verification/lib/index.js
       config:
         mode: enforce
-        maxCapturedEvidence: 200
-        maxCapturedBytes: 20971520
-        completionPermitTtlMs: 30000
+        maxCapturedEvidence: 400
+        maxCapturedBytes: 41943040
+        completionPermitTtlMs: 60000
         binderFamilyFallback: true
         oracles:
           deterministic: true
@@ -37,7 +54,7 @@
           proReview:
             enabled: false
             provider: spawn
-            maxDefects: 10
+            maxDefects: 20
         constraints: []
         intent:
           requireContractBeforeExecution: true
@@ -45,7 +62,7 @@
           freezeOnHumanConfirm: true
           consensusCount: 1
           provider: lmstudio
-          model: qwen3.8-27b-gsq-rco
+          model: ornith-1.5-9b
           readOnlyToolAllowlist:
             - read
             - read_file
@@ -61,7 +78,7 @@
           sourceBasis:
             includeAttachments: true
             includeControlDocs: true
-            maxEntries: 200
+            maxEntries: 400
         blobDir: __DSH_HOME__/profiles/robust-local/verification-blobs
         systemPromptSection: true
 

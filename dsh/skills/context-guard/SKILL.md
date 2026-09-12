@@ -14,4 +14,10 @@ This skill is automatically active with the DSH context guard. Follow its budget
 - Checkpoint preparation from 25k to 30k: preserve the live objective, constraints, work completed, decisions, changed files, relevant commands/results, unresolved errors, failed approaches, current state, and one next action.
 - Automatic compacting begins at about 30k tokens for `lmstudio/qwen/qwen3.5-9b`.
 
-Treat identical commands, identical file reads, and materially equivalent tool calls without changed evidence as non-progress. After three no-progress actions, re-evaluate instead of continuing; after five equivalent attempts, abandon that approach. If no safe alternative exists, report the blocker.
+The executor measures progress from result fingerprints, successful workspace mutations, referenced files, and recent action sequences. Identical reads, repeated timeouts, and materially equivalent calls without new evidence do not reset the budget. Assistant prose is only a signal; it never counts as progress.
+
+Every turn has hard executor budgets: 48 steps, 48 tool calls, 15 minutes, and 180,000 high-water tokens by default. These counters include different tools in the same investigation and are reset only by a new user turn; compaction cannot renew them.
+
+After a timeout, the existing managed process executor must settle the process tree and collect available output before the guard enters diagnostic mode. Diagnostic mode permits at most three bounded inspection/test-diagnosis calls, two minutes, and 24,000 tokens. The exact timed-out command is blocked until the executor observes a relevant code/configuration change or a changed execution strategy.
+
+When the guard emits `PAUSE`, it cancels the active agent turn and denies subsequent tool calls at the executor boundary. A model-written explanation or a context notice cannot override that state. A repeated cycle such as read → grep → rerun → read is closed when the tool/file/result sequence repeats, even if the individual calls are not identical.

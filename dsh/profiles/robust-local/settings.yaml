@@ -9,30 +9,29 @@ llm-pi-ai:
       # DSH, while its Chat Completions wrapper rejects image/webp.
       api: openai-responses
       baseURL: http://127.0.0.1:1234/v1
-      defaultContextWindow: 85000
+      defaultContextWindow: 262144
       # Local reasoning can remain silent while the model is thinking; give
       # the stream watchdog more time and leave room for the final answer.
       streamIdleTimeoutMs: 900000
       models:
-        - id: qwen3.8-27b-gsq-rco
+        - id: ornith-1.5-9b
           input: [text, image]
           # Match the capacity actually loaded by LM Studio, not the model's
           # larger training-time context limit.
-          contextWindow: 85000
-          maxTokens: 65536
-          # LM Studio's Responses endpoint accepts the OpenAI reasoning
-          # levels through `xhigh`; `max` is a compatibility alias for it.
+          contextWindow: 262144
+          maxTokens: 131072
+          # Ornith exposes binary reasoning options through LM Studio.
           reasoningEfforts:
-            off: "none"
-            minimal: "minimal"
-            low: "low"
-            medium: "medium"
-            high: "high"
-            xhigh: "xhigh"
-            max: "xhigh"
+            off: "off"
+            minimal: "on"
+            low: "on"
+            medium: "on"
+            high: "on"
+            xhigh: "on"
+            max: "on"
 agent-default-model:
   provider: lmstudio
-  model: qwen3.8-27b-gsq-rco
+  model: ornith-1.5-9b
   reasoningEffort: high
 permission:
   defaultPreset: danger-full-access
