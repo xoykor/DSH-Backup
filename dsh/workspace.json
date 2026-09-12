@@ -7,42 +7,18 @@
     "initialized": true,
     "workspaceIds": [
       "f3c282aa-e1b3-4290-a3bc-7621c3f8cbdb",
-      "954a679f-e387-4ec5-be9a-0578b95412ba",
-      "93a9301d-628f-4fc5-a640-e0ec494f2ee7",
-      "1d78011e-8141-4fca-adce-00711c8d3cc8",
-      "c4a37108-0b85-49cc-ab26-b0e4200fbdef"
+      "954a679f-e387-4ec5-be9a-0578b95412ba"
     ],
     "archivedSessionIds": []
   },
   "tables": {
     "workspaces": {
-      "c4a37108-0b85-49cc-ab26-b0e4200fbdef": {
-        "path": "__HOME__/Documentos/Estudo",
-        "title": "Estudo",
-        "sessionIds": [],
-        "createdAt": "2026-09-06T18:06:39.492Z",
-        "updatedAt": "2026-09-06T18:06:39.492Z"
-      },
-      "1d78011e-8141-4fca-adce-00711c8d3cc8": {
-        "path": "__HOME__/Documentos/Estudo/Qwen",
-        "title": "Qwen",
-        "sessionIds": [],
-        "createdAt": "2026-09-06T18:08:14.225Z",
-        "updatedAt": "2026-09-12T15:00:48.398Z"
-      },
-      "93a9301d-628f-4fc5-a640-e0ec494f2ee7": {
-        "path": "__HOME__/Documentos/Estudo/Qwen/Andrea Landing page",
-        "title": "Andrea Landing page",
-        "sessionIds": [],
-        "createdAt": "2026-09-10T23:24:24.207Z",
-        "updatedAt": "2026-09-11T01:34:16.843Z"
-      },
       "954a679f-e387-4ec5-be9a-0578b95412ba": {
         "path": "__HOME__/Documentos/Estudo/Projetinho",
         "title": "Projetinho",
         "sessionIds": [],
         "createdAt": "2026-09-11T21:06:35.350Z",
-        "updatedAt": "2026-09-12T13:48:28.082Z"
+        "updatedAt": "2026-09-12T15:47:49.359Z"
       },
       "f3c282aa-e1b3-4290-a3bc-7621c3f8cbdb": {
         "path": "__HOME__/Documentos/DSH",

@@ -112,6 +112,9 @@ trust_level = "trusted"
 [projects."__HOME__/Documentos/DSH"]
 trust_level = "trusted"
 
+[projects."__HOME__/Documents/Codex/2026-09-12/new-chat-2"]
+trust_level = "trusted"
+
 [desktop]
 followUpQueueMode = "steer"
 conversationDetailMode = "STEPS_COMMANDS"
