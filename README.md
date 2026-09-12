@@ -6,9 +6,13 @@ configuration. It deliberately does not keep sessions, conversation history,
 caches, browser state or credentials. Workspace definitions are retained with
 their session associations removed.
 
-The current snapshot targets DSH `0.1.2-rc.1`, Node `>=22` and pnpm `11.26.0`.
+The current snapshot targets DSH `0.1.5-rc.2`, Node `>=22` and pnpm `11.26.0`.
 The DSH and pnpm runtime versions are installed from the committed
 `runtime/package-lock.json`.
+
+This version includes generic file attachments in the web composer. Text files
+such as `.txt` and `.md`, as well as other file formats, are stored locally and
+made available to the model through the attachment file path.
 
 ## Restore
 
