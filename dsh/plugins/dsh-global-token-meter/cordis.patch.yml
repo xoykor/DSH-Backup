@@ -1,0 +1,3 @@
+- insert:
+    - id: global-token-meter
+      name: dsh-global-token-meter

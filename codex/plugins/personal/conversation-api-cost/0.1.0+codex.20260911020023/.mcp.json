@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "conversation_api_cost": {
+      "command": "python3",
+      "args": [
+        "./scripts/server.py"
+      ],
+      "cwd": ".",
+      "enabled": true,
+      "startup_timeout_sec": 10,
+      "tool_timeout_sec": 30
+    }
+  }
+}

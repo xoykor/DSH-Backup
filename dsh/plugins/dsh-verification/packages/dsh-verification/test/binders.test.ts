@@ -1,0 +1,307 @@
+import { describe, expect, it } from 'vitest';
+import type { BoundEvidence, ContractIdentity, EvidenceType, SelectorV1 } from '@bpc-oss/dsh-evidence';
+import { normalizedArgsHash as hash } from '@bpc-oss/dsh-evidence';
+import { createMemoryBlobStore, storePayload } from '../src/evidence-store';
+import { bindSelectorForAc, findDuplicateSelectors } from '../src/binders';
+import type { AcceptanceCriterion } from '@bpc-oss/dsh-evidence';
+import type { EvidenceRef, CaptureFailureRecord } from '../src/projection';
+
+const identity: ContractIdentity = { contractId: 'c-1', revision: 0, contractContentHash: 'cc', basisHash: 'bb', sessionId: 's-1' };
+
+function selector(toolIdentity: string, argsHash: string, evidenceType: EvidenceType): SelectorV1 {
+  return { schemaVersion: 1, toolIdentity, normalizedArgsHash: argsHash, evidenceType };
+}
+
+function ref(callId: string, tool: string, args: Record<string, unknown>, type: EvidenceType, resultSeq: number, blobHash: string): EvidenceRef {
+  return { callId, toolIdentity: tool, normalizedArgsHash: hash(args), blobHash, truncated: false, originalLength: 1, schemaVersion: 1, contractIdentity: identity, evidenceType: type, resultSeq, summary: `${tool} ${type}` };
+}
+
+function failure(callId: string, tool: string, args: Record<string, unknown>, type: EvidenceType, resultSeq: number): CaptureFailureRecord {
+  return { contractIdentity: identity, callId, toolIdentity: tool, normalizedArgsHash: hash(args), evidenceType: type, resultSeq, error: 'boom' };
+}
+
+async function makeBlob(store: ReturnType<typeof createMemoryBlobStore>, tool: string, argsHash: string, type: EvidenceType, failed = false): Promise<string> {
+  const captured = { callId: 'x', toolIdentity: tool, schemaVersion: 1, normalizedArgs: {}, normalizedArgsHash: argsHash, evidenceType: type, payload: { exitCode: 0 }, producedBy: 'tool', failed, contractIdentity: identity };
+  const stored = await storePayload(store, captured);
+  return stored.blobKey;
+}
+
+describe('bindSelectorForAc (v9 exact-only, highest committed seq, one-evidence-one-AC)', () => {
+  it('binds the exact selector match', async () => {
+    const store = createMemoryBlobStore();
+    const args = { command: 'npm test' };
+    const blob = await makeBlob(store, 'bash', hash(args), 'test_run');
+    const outcome = await bindSelectorForAc(
+      { id: 'AC1', desc: 'run tests', oracleHint: 'test', selector: selector('bash', hash(args), 'test_run') },
+      { contractIdentity: identity, refs: [ref('call-1', 'bash', args, 'test_run', 7, blob)], captureFailures: [], loadBlob: (k) => store.read(k) },
+      () => 'test_run'
+    );
+    expect(outcome.kind).toBe('bound');
+    if (outcome.kind === 'bound') {
+      expect(outcome.evidence).toMatchObject({ acId: 'AC1', selectorRef: 'c-1:0:AC1', callId: 'call-1' });
+    }
+  });
+
+  it('does NOT bind an echo PASS impersonating npm test', async () => {
+    const store = createMemoryBlobStore();
+    const testArgs = { command: 'npm test' };
+    const echoArgs = { command: 'echo PASS' };
+    const blob = await makeBlob(store, 'bash', hash(echoArgs), 'test_run');
+    const outcome = await bindSelectorForAc(
+      { id: 'AC1', desc: 'run tests', oracleHint: 'test', selector: selector('bash', hash(testArgs), 'test_run') },
+      { contractIdentity: identity, refs: [ref('call-1', 'bash', echoArgs, 'test_run', 7, blob)], captureFailures: [], loadBlob: (k) => store.read(k) },
+      () => 'test_run'
+    );
+    expect(outcome.kind).toBe('no-evidence');
+  });
+
+  it('a capture-failure at a HIGHER seq than an old PASS wins (no cherry-pick of the old PASS)', async () => {
+    const store = createMemoryBlobStore();
+    const args = { command: 'npm test' };
+    const blob = await makeBlob(store, 'bash', hash(args), 'test_run');
+    const outcome = await bindSelectorForAc(
+      { id: 'AC1', desc: 'run tests', oracleHint: 'test', selector: selector('bash', hash(args), 'test_run') },
+      {
+        contractIdentity: identity,
+        refs: [ref('call-1', 'bash', args, 'test_run', 5, blob)],
+        captureFailures: [failure('call-2', 'bash', args, 'test_run', 9)],
+        loadBlob: (k) => store.read(k)
+      },
+      () => 'test_run'
+    );
+    expect(outcome.kind).toBe('capture-failure');
+  });
+
+  it('a missing/corrupt blob yields missing-blob (fail closed)', async () => {
+    const args = { command: 'npm test' };
+    const outcome = await bindSelectorForAc(
+      { id: 'AC1', desc: 'run tests', oracleHint: 'test', selector: selector('bash', hash(args), 'test_run') },
+      { contractIdentity: identity, refs: [ref('call-1', 'bash', args, 'test_run', 7, 'deadbeef')], captureFailures: [], loadBlob: async () => null },
+      () => 'test_run'
+    );
+    expect(outcome.kind).toBe('missing-blob');
+  });
+
+  it('AC without a frozen selector is not-harnessed (routes to T2/T4)', async () => {
+    const outcome = await bindSelectorForAc(
+      { id: 'AC1', desc: 'review my work', oracleHint: 'review' },
+      { contractIdentity: identity, refs: [], captureFailures: [], loadBlob: async () => null },
+      () => 'assistant_response'
+    );
+    expect(outcome.kind).toBe('not-harnessed');
+  });
+});
+
+describe('bindSelectorForAc (v9.1 file-family compatibility)', () => {
+  it('binds a read quote against a file_diff selector (same tool + args, different derived type)', async () => {
+    const store = createMemoryBlobStore();
+    const args = { path: 'artifact.txt' };
+    const blob = await makeBlob(store, 'read', hash(args), 'quote_with_location');
+    const outcome = await bindSelectorForAc(
+      { id: 'AC1', desc: 'artifact contains DONE', oracleHint: 'file', selector: selector('read', hash(args), 'file_diff') },
+      { contractIdentity: identity, refs: [ref('call-1', 'read', args, 'quote_with_location', 7, blob)], captureFailures: [], loadBlob: (k) => store.read(k) },
+      () => 'file_diff'
+    );
+    expect(outcome.kind).toBe('bound');
+  });
+
+  it('v9.4: exact match is type-agnostic (same tool+argsHash binds test_run to a command_output selector — the oracle judges)', async () => {
+    const store = createMemoryBlobStore();
+    const args = { command: 'npm test' };
+    const blob = await makeBlob(store, 'bash', hash(args), 'test_run');
+    const outcome = await bindSelectorForAc(
+      { id: 'AC1', desc: 'run tests', oracleHint: 'run', selector: selector('bash', hash(args), 'command_output') },
+      { contractIdentity: identity, refs: [ref('call-1', 'bash', args, 'test_run', 7, blob)], captureFailures: [], loadBlob: (k) => store.read(k) },
+      () => 'command_output'
+    );
+    // selector 的 evidenceType 是声明猜测；同工具同参数的真实证据应绑定后交 oracle 判分
+    expect(outcome.kind).toBe('bound');
+  });
+
+  it('propagates a file-family capture failure at the highest seq (fail closed)', async () => {
+    const store = createMemoryBlobStore();
+    const args = { path: 'artifact.txt' };
+    const blob = await makeBlob(store, 'read', hash(args), 'quote_with_location');
+    const outcome = await bindSelectorForAc(
+      { id: 'AC1', desc: 'artifact contains DONE', oracleHint: 'file', selector: selector('read', hash(args), 'file_diff') },
+      {
+        contractIdentity: identity,
+        refs: [ref('call-1', 'read', args, 'quote_with_location', 5, blob)],
+        captureFailures: [failure('call-2', 'read', args, 'quote_with_location', 9)],
+        loadBlob: (k) => store.read(k)
+      },
+      () => 'file_diff'
+    );
+    expect(outcome.kind).toBe('capture-failure');
+  });
+});
+
+describe('bindSelectorForAc (v9.2 family fallback — 完成任务能力修复)', () => {
+  function fileCaptured(tool: string, args: Record<string, unknown>, type: EvidenceType, payload: Record<string, unknown>) {
+    return { callId: 'x', toolIdentity: tool, schemaVersion: 1, normalizedArgs: args, normalizedArgsHash: hash(args), evidenceType: type, payload, producedBy: 'tool' as const, failed: false, contractIdentity: identity };
+  }
+
+  it('familyFallback binds a real write→file_diff when the exact glob selector has no committed run', async () => {
+    const store = createMemoryBlobStore();
+    const globArgs = { pattern: 'docs/*.md' };
+    const writeArgs = { path: 'docs/design.md', content: 'architecture: ok' };
+    const stored = await storePayload(store, fileCaptured('write', writeArgs, 'file_diff', { path: 'docs/design.md', content: 'architecture: ok' }));
+    const outcome = await bindSelectorForAc(
+      { id: 'AC1', desc: 'docs exist', oracleHint: 'file', selector: selector('glob', hash(globArgs), 'quote_with_location') },
+      { contractIdentity: identity, refs: [ref('call-1', 'write', writeArgs, 'file_diff', 9, stored.blobKey)], captureFailures: [], loadBlob: (k) => store.read(k) },
+      () => 'quote_with_location',
+      { familyFallback: true }
+    );
+    expect(outcome.kind).toBe('bound');
+    if (outcome.kind === 'bound') {
+      expect(outcome.familyFallback).toBe(true);
+      expect(outcome.evidence).toMatchObject({ toolIdentity: 'write', evidenceType: 'file_diff', acId: 'AC1' });
+    }
+  });
+
+  it('familyFallback does NOT hijack when an exact match exists (exact wins)', async () => {
+    const store = createMemoryBlobStore();
+    const globArgs = { pattern: 'docs/*.md' };
+    const writeArgs = { path: 'docs/design.md', content: 'architecture: ok' };
+    const globStored = await storePayload(store, fileCaptured('glob', globArgs, 'quote_with_location', { quote: 'No files found' }));
+    const writeStored = await storePayload(store, fileCaptured('write', writeArgs, 'file_diff', { path: 'docs/design.md', content: 'architecture: ok' }));
+    const outcome = await bindSelectorForAc(
+      { id: 'AC1', desc: 'docs exist', oracleHint: 'file', selector: selector('glob', hash(globArgs), 'quote_with_location') },
+      {
+        contractIdentity: identity,
+        refs: [
+          ref('call-glob', 'glob', globArgs, 'quote_with_location', 10, globStored.blobKey),
+          ref('call-write', 'write', writeArgs, 'file_diff', 9, writeStored.blobKey)
+        ],
+        captureFailures: [],
+        loadBlob: (k) => store.read(k)
+      },
+      () => 'quote_with_location',
+      { familyFallback: true }
+    );
+    expect(outcome.kind).toBe('bound');
+    if (outcome.kind === 'bound') {
+      expect(outcome.familyFallback).toBeUndefined();
+      expect(outcome.evidence.toolIdentity).toBe('glob');
+    }
+  });
+
+  it('without familyFallback the exact-only behavior is unchanged (no-evidence)', async () => {
+    const store = createMemoryBlobStore();
+    const globArgs = { pattern: 'docs/*.md' };
+    const writeArgs = { path: 'docs/design.md', content: 'architecture: ok' };
+    const stored = await storePayload(store, fileCaptured('write', writeArgs, 'file_diff', { path: 'docs/design.md', content: 'architecture: ok' }));
+    const outcome = await bindSelectorForAc(
+      { id: 'AC1', desc: 'docs exist', oracleHint: 'file', selector: selector('glob', hash(globArgs), 'quote_with_location') },
+      { contractIdentity: identity, refs: [ref('call-1', 'write', writeArgs, 'file_diff', 9, stored.blobKey)], captureFailures: [], loadBlob: (k) => store.read(k) },
+      () => 'quote_with_location'
+    );
+    expect(outcome.kind).toBe('no-evidence');
+  });
+
+  it('familyFallback skips corrupt/missing family blobs and yields no-evidence', async () => {
+    const store = createMemoryBlobStore();
+    const globArgs = { pattern: 'docs/*.md' };
+    const writeArgs = { path: 'docs/design.md', content: 'architecture: ok' };
+    const outcome = await bindSelectorForAc(
+      { id: 'AC1', desc: 'docs exist', oracleHint: 'file', selector: selector('glob', hash(globArgs), 'quote_with_location') },
+      { contractIdentity: identity, refs: [ref('call-1', 'write', writeArgs, 'file_diff', 9, 'deadbeef')], captureFailures: [], loadBlob: async () => null },
+      () => 'quote_with_location',
+      { familyFallback: true }
+    );
+    expect(outcome.kind).toBe('no-evidence');
+  });
+
+  it('familyFallback REJECTS evidence from a DIFFERENT path (desc names src/math.js, evidence is src/other.js)', async () => {
+    const store = createMemoryBlobStore();
+    const globArgs = { pattern: 'src/*.js' };
+    const wrongArgs = { path: 'src/other.js', content: 'export function isEven(n) { return n % 2 === 0; }' };
+    const stored = await storePayload(store, fileCaptured('edit', wrongArgs, 'file_diff', { path: 'src/other.js', content: 'export function isEven(n) { return n % 2 === 0; }' }));
+    const outcome = await bindSelectorForAc(
+      { id: 'AC1', desc: 'src/math.js contains "export function isEven"', oracleHint: 'file', selector: selector('glob', hash(globArgs), 'quote_with_location') },
+      { contractIdentity: identity, refs: [ref('call-1', 'edit', wrongArgs, 'file_diff', 9, stored.blobKey)], captureFailures: [], loadBlob: (k) => store.read(k) },
+      () => 'quote_with_location',
+      { familyFallback: true }
+    );
+    expect(outcome.kind).toBe('no-evidence');
+  });
+
+  it('familyFallback ACCEPTS evidence whose path matches the desc (src/math.js)', async () => {
+    const store = createMemoryBlobStore();
+    const globArgs = { pattern: 'src/*.js' };
+    const rightArgs = { path: 'src/math.js', content: 'export function isEven(n) { return n % 2 === 0; }' };
+    const stored = await storePayload(store, fileCaptured('edit', rightArgs, 'file_diff', { path: 'src/math.js', content: 'export function isEven(n) { return n % 2 === 0; }' }));
+    const outcome = await bindSelectorForAc(
+      { id: 'AC1', desc: 'src/math.js contains "export function isEven"', oracleHint: 'file', selector: selector('glob', hash(globArgs), 'quote_with_location') },
+      { contractIdentity: identity, refs: [ref('call-1', 'edit', rightArgs, 'file_diff', 9, stored.blobKey)], captureFailures: [], loadBlob: (k) => store.read(k) },
+      () => 'quote_with_location',
+      { familyFallback: true }
+    );
+    expect(outcome.kind).toBe('bound');
+    if (outcome.kind === 'bound') {
+      expect(outcome.familyFallback).toBe(true);
+    }
+  });
+
+  describe('v9.3 run-family fallback (command alignment)', () => {
+    function runCaptured(tool: string, args: Record<string, unknown>, command: string, exitCode: number) {
+      return { callId: 'x', toolIdentity: tool, schemaVersion: 1, normalizedArgs: args, normalizedArgsHash: hash(args), evidenceType: 'command_output' as const, payload: { command, exitCode }, producedBy: 'tool' as const, failed: false, contractIdentity: identity };
+    }
+
+    it('binds a different-args shell evidence whose command matches the AC desc (fib)', async () => {
+      const store = createMemoryBlobStore();
+      const frozenArgs = { command: 'python test_fib.py' };
+      const actualArgs = { command: 'python -c "import fib; print(fib.fib(10))"' };
+      const stored = await storePayload(store, runCaptured('shell', actualArgs, 'python -c "import fib; print(fib.fib(10))"', 0));
+      const outcome = await bindSelectorForAc(
+        { id: 'AC1', desc: 'python 运行 fib(10) 输出 55', oracleHint: 'run', selector: selector('shell', hash(frozenArgs), 'command_output') },
+        { contractIdentity: identity, refs: [ref('call-1', 'shell', actualArgs, 'command_output', 9, stored.blobKey)], captureFailures: [], loadBlob: (k) => store.read(k) },
+        () => 'command_output',
+        { familyFallback: true }
+      );
+      expect(outcome.kind).toBe('bound');
+      if (outcome.kind === 'bound') {
+        expect(outcome.familyFallback).toBe(true);
+        expect((outcome.evidence.payload as { command?: string; exitCode?: number }).command).toContain('fib');
+        expect((outcome.evidence.payload as { exitCode?: number }).exitCode).toBe(0);
+      }
+    });
+
+    it('REJECTS a shell evidence whose command has no AC-aligned token (wrong command)', async () => {
+      const store = createMemoryBlobStore();
+      const frozenArgs = { command: 'python test_fib.py' };
+      const wrongArgs = { command: 'ls -la /tmp' };
+      const stored = await storePayload(store, runCaptured('shell', wrongArgs, 'ls -la /tmp', 0));
+      const outcome = await bindSelectorForAc(
+        { id: 'AC1', desc: 'python 运行 fib(10) 输出 55', oracleHint: 'run', selector: selector('shell', hash(frozenArgs), 'command_output') },
+        { contractIdentity: identity, refs: [ref('call-1', 'shell', wrongArgs, 'command_output', 9, stored.blobKey)], captureFailures: [], loadBlob: (k) => store.read(k) },
+        () => 'command_output',
+        { familyFallback: true }
+      );
+      expect(outcome.kind).toBe('no-evidence');
+    });
+
+    it('without familyFallback the run-family exact-only behavior is unchanged', async () => {
+      const store = createMemoryBlobStore();
+      const frozenArgs = { command: 'python test_fib.py' };
+      const actualArgs = { command: 'python -c "import fib; print(fib.fib(10))"' };
+      const stored = await storePayload(store, runCaptured('shell', actualArgs, 'python -c "import fib; print(fib.fib(10))"', 0));
+      const outcome = await bindSelectorForAc(
+        { id: 'AC1', desc: 'python 运行 fib(10) 输出 55', oracleHint: 'run', selector: selector('shell', hash(frozenArgs), 'command_output') },
+        { contractIdentity: identity, refs: [ref('call-1', 'shell', actualArgs, 'command_output', 9, stored.blobKey)], captureFailures: [], loadBlob: (k) => store.read(k) },
+        () => 'command_output'
+      );
+      expect(outcome.kind).toBe('no-evidence');
+    });
+  });
+});
+
+describe('findDuplicateSelectors', () => {
+  it('rejects two ACs sharing one exact selector', () => {
+    const acs: AcceptanceCriterion[] = [
+      { id: 'AC1', desc: 'a', oracleHint: 'test', selector: selector('bash', hash({ command: 'npm test' }), 'test_run') },
+      { id: 'AC2', desc: 'b', oracleHint: 'test', selector: selector('bash', hash({ command: 'npm test' }), 'test_run') }
+    ];
+    expect(findDuplicateSelectors(acs)).toHaveLength(1);
+  });
+});

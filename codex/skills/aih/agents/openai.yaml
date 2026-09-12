@@ -1,0 +1,7 @@
+interface:
+  display_name: "AI Clean Harness"
+  short_description: "Run coding tasks through AIH verification"
+  default_prompt: "Use $aih to run this software task through the external AI Clean Harness."
+
+policy:
+  allow_implicit_invocation: false

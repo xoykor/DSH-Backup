@@ -1,0 +1,22 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      dsh-context-guard:
+        specifier: file:__DSH_HOME__/plugins/dsh-context-guard
+        version: file:../../plugins/dsh-context-guard
+
+packages:
+
+  dsh-context-guard@file:../../plugins/dsh-context-guard:
+    resolution: {directory: ../../plugins/dsh-context-guard, type: directory}
+
+snapshots:
+
+  dsh-context-guard@file:../../plugins/dsh-context-guard: {}

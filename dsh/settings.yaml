@@ -1,0 +1,40 @@
+ui-onboarding:
+  welcomeNoticeVersion: 2026-08-13.1
+agent-presets:
+  default: minimal
+llm-deepseek:
+  models:
+    - id: deepseek-v4-flash
+      name: DeepSeek-V4-Flash
+      contextWindow: 1000000
+    - id: deepseek-v4-pro
+      name: DeepSeek-V4-Pro
+      contextWindow: 1000000
+llm-pi-ai:
+  providers:
+    google:
+      apiKeyEnv: GOOGLE_API_KEY
+    lmstudio:
+      displayName: LM Studio
+      apiKeyEnv: LMSTUDIO_API_KEY
+      # LM Studio's Responses endpoint accepts the WebP data URLs emitted by
+      # DSH, while its Chat Completions wrapper rejects image/webp.
+      api: openai-responses
+      baseURL: http://127.0.0.1:1234/v1
+      # Raised to the model's own cap (ornith). The backend's real window is
+      # still controlled by LM Studio; this only sets DSH's assumed size.
+      defaultContextWindow: 262144
+      # Local reasoning can remain silent while the model is thinking; give
+      # the stream watchdog more time and leave room for the final answer.
+      streamIdleTimeoutMs: 900000
+      models:
+        - id: ornith-1.5-9b
+          input: [ text, image ]
+          maxTokens: 65536
+        - id: qwen3.8-27b-gsq-rco
+agent-default-model:
+  provider: relay-codex
+  model: gpt-5.6-luna
+  reasoningEffort: max
+permission:
+  defaultPreset: danger-full-access

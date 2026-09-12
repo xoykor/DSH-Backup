@@ -1,0 +1,138 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: false
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      dsh-context-guard:
+        specifier: file:__DSH_HOME__/plugins/dsh-context-guard
+        version: file:../../plugins/dsh-context-guard
+      dsh-global-token-meter:
+        specifier: link:__DSH_HOME__/plugins/dsh-global-token-meter
+        version: link:../../plugins/dsh-global-token-meter
+      relay-dsh-plugin-codex:
+        specifier: 0.2.2
+        version: 0.2.2
+
+packages:
+
+  '@openai/codex@0.149.0':
+    resolution: {integrity: sha512-i4dryj2Y1j+00Mb5n+0n71EYnTK9/KDc2cdFo/dXD0d1oTog2bhUssKDEIOnKmnEf51P0Z/HJTWvTKw/UHyOvQ==}
+    engines: {node: '>=16'}
+    hasBin: true
+
+  '@openai/codex@0.149.0-darwin-arm64':
+    resolution: {integrity: sha512-GsZJbzBWiD48RETrO8VHGAQNgfSrUVxItXZFeD87wswatPi0+lKuQo8Dx4nMYmOZhZrVtwr3al/feRrZxnDV8Q==}
+    engines: {node: '>=16'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@openai/codex@0.149.0-darwin-x64':
+    resolution: {integrity: sha512-H+mMgW3Nhc5QzGWEklCoFqACuOc0cVpgPkPQRw0LShoK7P5664T6BRnyl1yzT6orKPKv49cXry7DIWWZ19SanQ==}
+    engines: {node: '>=16'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@openai/codex@0.149.0-linux-arm64':
+    resolution: {integrity: sha512-fAXPpvIob+11RNZJS9CVVTsKb+V4Hw3woGFPj42D7fU2wBJUKI2jfAc4fLJNtrpwRecLeW601mtkMHOSIbWuuA==}
+    engines: {node: '>=16'}
+    cpu: [arm64]
+    os: [linux]
+
+  '@openai/codex@0.149.0-linux-x64':
+    resolution: {integrity: sha512-uZXaN9JPxu0/jjnqqJeTd4kRYPnjVZK3MiVndfG1mHhEaoDKL7ScWHfPqvAEOjwsSDEmQSlMfUkmvYp/CHciYw==}
+    engines: {node: '>=16'}
+    cpu: [x64]
+    os: [linux]
+
+  '@openai/codex@0.149.0-win32-arm64':
+    resolution: {integrity: sha512-pUd8MzuwtqT5DhM1NUE1gETWIZ9fkDA1XB7tt9YNIi/peUgLuziQgZd7o0bNON4cNzgbil1YUN1qDTgQm0g3pg==}
+    engines: {node: '>=16'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@openai/codex@0.149.0-win32-x64':
+    resolution: {integrity: sha512-qKbwSOOO/fdhQ5MlXE2fts6taPxRPZ/zqeC+eqHD72hLRymV9rFCUbUxOCquognUPRPvS/2/kRCV0UVhoDd3yQ==}
+    engines: {node: '>=16'}
+    cpu: [x64]
+    os: [win32]
+
+  dsh-context-guard@file:../../plugins/dsh-context-guard:
+    resolution: {directory: ../../plugins/dsh-context-guard, type: directory}
+
+  lucide-react@1.42.0:
+    resolution: {integrity: sha512-b3jprplnoLS8n5etw1z8xODe3hF/yjKATrTitsrKrnjUhCef5BdDct6Ppv3zVvzFwmtfWgLO6XNM3C9fAD93ug==}
+    peerDependencies:
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  relay-dsh-plugin-codex@0.2.2:
+    resolution: {integrity: sha512-LW1cq4Nj2nXSV+5mXA+eRPR65HdREl6ASckIy3n9IzJ+Ubg08+cnZ9O1ji809KPM38PQdFMvqho6aTLew6co5Q==}
+    engines: {node: '>=22.13'}
+    peerDependencies:
+      '@deepseek-ai/dsh-llm': '>=0.1.1-rc.2 <0.1.2-0 || >=0.1.2-alpha.2 <0.1.3-0'
+      '@deepseek-ai/dsh-session': '>=0.1.1-rc.2 <0.1.2-0 || >=0.1.2-alpha.2 <0.1.3-0'
+      '@deepseek-ai/dsh-typert-protocol': '>=0.1.1-rc.2 <0.1.2-0 || >=0.1.2-alpha.2 <0.1.3-0'
+      react: ^18.2.0
+    peerDependenciesMeta:
+      '@deepseek-ai/dsh-llm':
+        optional: true
+      '@deepseek-ai/dsh-session':
+        optional: true
+      '@deepseek-ai/dsh-typert-protocol':
+        optional: true
+      react:
+        optional: true
+
+  relay-dsh-plugin-session-import@0.2.2:
+    resolution: {integrity: sha512-jCxHBgy2CGJGPFtxL2EsjZDxx8lxjnodgjf37G97nBTVID2NwyzbbzxuDzuQhxFKQ3bXuTKsmo7R1BiMjb/fcQ==}
+    engines: {node: '>=22.13'}
+    peerDependencies:
+      react: ^18.2.0
+    peerDependenciesMeta:
+      react:
+        optional: true
+
+snapshots:
+
+  '@openai/codex@0.149.0':
+    optionalDependencies:
+      '@openai/codex-darwin-arm64': '@openai/codex@0.149.0-darwin-arm64'
+      '@openai/codex-darwin-x64': '@openai/codex@0.149.0-darwin-x64'
+      '@openai/codex-linux-arm64': '@openai/codex@0.149.0-linux-arm64'
+      '@openai/codex-linux-x64': '@openai/codex@0.149.0-linux-x64'
+      '@openai/codex-win32-arm64': '@openai/codex@0.149.0-win32-arm64'
+      '@openai/codex-win32-x64': '@openai/codex@0.149.0-win32-x64'
+
+  '@openai/codex@0.149.0-darwin-arm64':
+    optional: true
+
+  '@openai/codex@0.149.0-darwin-x64':
+    optional: true
+
+  '@openai/codex@0.149.0-linux-arm64':
+    optional: true
+
+  '@openai/codex@0.149.0-linux-x64':
+    optional: true
+
+  '@openai/codex@0.149.0-win32-arm64':
+    optional: true
+
+  '@openai/codex@0.149.0-win32-x64':
+    optional: true
+
+  dsh-context-guard@file:../../plugins/dsh-context-guard: {}
+
+  lucide-react@1.42.0: {}
+
+  relay-dsh-plugin-codex@0.2.2:
+    dependencies:
+      '@openai/codex': 0.149.0
+      lucide-react: 1.42.0
+      relay-dsh-plugin-session-import: 0.2.2
+
+  relay-dsh-plugin-session-import@0.2.2: {}

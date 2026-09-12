@@ -1,0 +1,2 @@
+name: Local Models - PTC
+description: PTC coding agent using local Qwen model via LM Studio, with Ralph and subagent plugins disabled.

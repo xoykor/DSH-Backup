@@ -1,0 +1,5 @@
+prefix_rule(pattern=["gtk-launch", "chatgpt"], decision="allow")
+prefix_rule(pattern=["git", "init"], decision="allow")
+prefix_rule(pattern=["aih", "init"], decision="allow")
+prefix_rule(pattern=["git", "status", "--short", "--branch"], decision="allow")
+prefix_rule(pattern=["kate"], decision="allow")

@@ -1,0 +1,17 @@
+{
+  "name": "dsh-profile-headless",
+  "private": true,
+  "dependencies": {
+    "dsh-context-guard": "file:__DSH_HOME__/plugins/dsh-context-guard"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-headless",
+        "dsh-context-guard"
+      ],
+      "patchReload": "startup"
+    }
+  }
+}

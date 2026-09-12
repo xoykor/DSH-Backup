@@ -1,0 +1,16 @@
+{
+  "name": "dsh-config-runtime",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.1.2-rc.1",
+    "pnpm": "11.26.0"
+  },
+  "allowScripts": {
+    "@deepseek-ai/dsh-subprocess-local": true,
+    "koffi": true,
+    "node-pty": true,
+    "@google/genai": true,
+    "protobufjs": true
+  }
+}

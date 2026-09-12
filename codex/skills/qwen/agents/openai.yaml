@@ -1,0 +1,7 @@
+interface:
+  display_name: "Qwen Local Subagent"
+  short_description: "Delegate implementation to local Qwen"
+  default_prompt: "Use $qwen to delegate this implementation to my local Qwen model and review its work."
+
+policy:
+  allow_implicit_invocation: true

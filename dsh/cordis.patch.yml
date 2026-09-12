@@ -1,0 +1,42 @@
+# Machine-wide context and loop protection for all DSH profiles that expose
+# these built-in rows. Profile-specific bundles may still add their own tools.
+- id: agent-instructions
+  disabled: false
+  config:
+    maxBytes: 12288
+- id: skill-filesystem
+  disabled: false
+- id: tool-skill
+  disabled: false
+- id: compaction-basic
+  disabled: false
+  config:
+    auto: true
+    thresholdRatio: 0.9375
+    retainTokens: 6000
+    maxTokens: 4096
+    compactionRetries: 1
+    maxOverflowRetries: 1
+    modelPolicies:
+      - provider: lmstudio
+        model: qwen3.8-27b-gsq-rco
+        thresholdRatio: 0.9375
+        retainTokens: 6000
+        maxTokens: 4096
+        compactionRetries: 1
+        maxOverflowRetries: 1
+- id: command-compact
+  disabled: false
+- id: tool-result-pruner
+  disabled: false
+  config:
+    thresholdChars: 6000
+    headChars: 3000
+    tailChars: 1000
+- id: repeat-tool-reminder
+  config:
+    thresholds: [3, 5]
+    argumentsPreviewChars: 500
+- insert:
+    - id: qwen-request-defaults
+      name: __DSH_HOME__/plugins/dsh-qwen-defaults/lib/index.js

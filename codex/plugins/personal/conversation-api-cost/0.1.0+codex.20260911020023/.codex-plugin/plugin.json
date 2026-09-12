@@ -1,0 +1,35 @@
+{
+  "name": "conversation-api-cost",
+  "version": "0.1.0+codex.20260911020023",
+  "description": "Estima quanto uma conversa custaria na API com base nos tokens de entrada, sa\u00edda e cache.",
+  "author": {
+    "name": "Local developer"
+  },
+  "license": "MIT",
+  "keywords": [
+    "tokens",
+    "api",
+    "cost",
+    "pricing",
+    "conversation"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Conversation API Cost",
+    "shortDescription": "Estime o custo de uma conversa na API",
+    "longDescription": "Calcula ou estima o custo em d\u00f3lares de uma conversa como se ela fosse enviada pela API, usando tokens expl\u00edcitos ou as mensagens vis\u00edveis da conversa.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read"
+    ],
+    "defaultPrompt": [
+      "Quanto esta conversa custaria na API?",
+      "Calcule o custo para o modelo gpt-5.6-sol",
+      "Compare o custo desta conversa em tr\u00eas modelos"
+    ],
+    "brandColor": "#2563EB"
+  },
+  "mcpServers": "./.mcp.json"
+}

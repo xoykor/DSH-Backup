@@ -1,0 +1,17 @@
+{
+  "name": "dsh-profile-robust-local",
+  "private": true,
+  "dependencies": {
+    "dsh-context-guard": "file:__DSH_HOME__/plugins/dsh-context-guard"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "dsh-context-guard"
+      ],
+      "patchReload": "startup"
+    }
+  }
+}

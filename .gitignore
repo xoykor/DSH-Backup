@@ -1,0 +1,32 @@
+# Runtime and package-manager output
+dsh/profiles/*/node_modules/
+dsh/**/node_modules/
+**/.cache/
+**/__pycache__/
+**/*.py[cod]
+
+# Credentials and local secrets
+**/.env
+**/.env.*
+**/auth.json
+**/auth.*.json
+**/credentials*
+**/*secret*
+**/*.pem
+**/*.key
+secrets/*.env
+secrets/*.yaml
+secrets/*.yml
+
+# Session/history/state data accidentally copied into the repository
+**/*.sqlite
+**/*.sqlite-*
+**/*.jsonl
+dsh/sessions/
+dsh/storages/
+dsh/compaction-*/
+codex/*history*
+**/compaction-*/
+
+# Local restore artifacts
+.restore-backups/

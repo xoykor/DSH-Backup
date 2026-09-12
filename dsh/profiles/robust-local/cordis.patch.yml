@@ -1,0 +1,70 @@
+# Isolated robust-local host policy. This layer does not affect other profiles.
+- id: settings
+  config:
+    path: __DSH_HOME__/profiles/robust-local/settings.yaml
+
+- id: web
+  config:
+    searchProvider: searxng
+
+- id: goal
+  disabled: true
+
+- insert:
+    - id: web-search-searxng
+      name: __DSH_HOME__/plugins/dsh-web-search-searxng/index.mjs
+      config:
+        baseURL: http://127.0.0.1:8888
+
+    - id: goal-verified
+      name: __DSH_HOME__/plugins/dsh-goal-verification/lib/index.js
+      config:
+        defaultMaxGoalRounds: 24
+
+    - id: verification
+      name: __DSH_HOME__/plugins/dsh-verification/packages/dsh-verification/lib/index.js
+      config:
+        mode: enforce
+        maxCapturedEvidence: 200
+        maxCapturedBytes: 20971520
+        completionPermitTtlMs: 30000
+        binderFamilyFallback: true
+        oracles:
+          deterministic: true
+          assistantResponse: true
+          coverage:
+            enabled: true
+          proReview:
+            enabled: false
+            provider: spawn
+            maxDefects: 10
+        constraints: []
+        intent:
+          requireContractBeforeExecution: true
+          contractOrigin: independent-capture
+          freezeOnHumanConfirm: true
+          consensusCount: 1
+          provider: lmstudio
+          model: qwen3.8-27b-gsq-rco
+          readOnlyToolAllowlist:
+            - read
+            - read_file
+            - list_dir
+            - glob
+            - grep
+            - search
+            - ask_user
+            - ask_user_question
+            - get_goal
+            - get_verification_plan
+            - web_search
+          sourceBasis:
+            includeAttachments: true
+            includeControlDocs: true
+            maxEntries: 200
+        blobDir: __DSH_HOME__/profiles/robust-local/verification-blobs
+        systemPromptSection: true
+
+    # The host half lets dsh-client-modules discover and serve lib/client.js.
+    - id: client-ui-verification
+      name: __DSH_HOME__/plugins/dsh-verification/packages/dsh-client-ui-verification/lib/index.js

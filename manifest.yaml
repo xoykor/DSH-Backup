@@ -1,0 +1,17 @@
+schemaVersion: 1
+dshPackage: "@deepseek-ai/dsh"
+dshVersion: "0.1.2-rc.1"
+nodeRequirement: ">=22"
+pnpmVersion: "11.26.0"
+runtimeLockfile: "runtime/package-lock.json"
+installPrefix: "~/.local"
+dshHome: "~/.dsh"
+codexHome: "~/.codex"
+
+# Sessions, conversation history, caches, browser state and credentials are
+# intentionally outside this snapshot.
+restore:
+  sessions: false
+  history: false
+  caches: false
+  credentials: false

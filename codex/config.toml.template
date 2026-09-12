@@ -1,0 +1,189 @@
+model = "gpt-6-astra"
+model_reasoning_effort = "low"
+service_tier = "default"
+[projects."__HOME__"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-03/co"]
+trust_level = "trusted"
+
+[projects."__CODEX_HOME__/.chatgpt-projects/g-p-6a99f26971a88191afda6a5a6cc7e120"]
+trust_level = "trusted"
+
+[projects."__CODEX_HOME__/.chatgpt-projects/g-p-6a99f5238570819180283aee752cf97b"]
+trust_level = "trusted"
+
+[projects."__CODEX_HOME__/.chatgpt-projects/g-p-6a99f9d2b5608191a40b7ce3835ba20f"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-03/rec"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-03/no"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-05/ve"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-05/s"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-05/in"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-05/pe"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-05/new-chat"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-05/v"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-07/v"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-08/s"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-08/s/work/codex-smoke"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documentos/Agentico"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-08/files-pasted-by-the-user-instale"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-08/aih"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documentos/Estudo/Qwen"]
+trust_level = "trusted"
+
+[projects."/tmp/qwen-codex-smoke.UZ3g0y"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-09/new-chat"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-10/new-chat"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-10/o-x20"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-10/es"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-10/new-chat-2"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-10/new-chat-3"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-10/realtime-voice-chat"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-11/a"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-11/ten"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-12/w"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documentos/Estudo/Projetinho"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-12/new-chat"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-12/https-artificialanalysis-ai-evaluations-artificial-analysis"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-12/h"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-12/ger"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documentos/DSH"]
+trust_level = "trusted"
+
+[desktop]
+followUpQueueMode = "steer"
+conversationDetailMode = "STEPS_COMMANDS"
+sansFontSize = 14
+codeFontSize = 13
+ambient-suggestions-enabled = true
+appearanceTheme = "dark"
+keepRemoteControlAwakeWhilePluggedIn = true
+
+[marketplaces.openai-bundled]
+source_type = "local"
+source = "__CODEX_HOME__/.tmp/bundled-marketplaces/openai-bundled"
+
+[marketplaces.openai-primary-runtime]
+source_type = "local"
+source = "__HOME__/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
+
+[plugins."codex-app-tools@openai-bundled"]
+enabled = true
+
+[plugins."sites@openai-bundled"]
+enabled = true
+
+[plugins."browser@openai-bundled"]
+enabled = true
+
+[plugins."unified-computer-use@openai-bundled"]
+enabled = true
+
+[plugins."visualize@openai-bundled"]
+enabled = true
+
+[plugins."documents@openai-primary-runtime"]
+enabled = true
+
+[plugins."pdf@openai-primary-runtime"]
+enabled = true
+
+[plugins."spreadsheets@openai-primary-runtime"]
+enabled = true
+
+[plugins."presentations@openai-primary-runtime"]
+enabled = true
+
+[plugins."template-creator@openai-primary-runtime"]
+enabled = true
+
+[plugins."chrome@openai-bundled"]
+enabled = true
+
+[plugins."conversation-api-cost@personal"]
+enabled = true
+
+[mcp_servers.node_repl]
+args = []
+command = "/usr/lib/chatgpt/resources/cua_node/bin/node_repl"
+startup_timeout_sec = 120
+
+[mcp_servers.node_repl.env]
+NODE_REPL_NATIVE_PIPE_CONNECT_TIMEOUT_MS = "1000"
+NODE_REPL_NODE_MODULE_DIRS = "/usr/lib/chatgpt/resources/cua_node/lib/node_modules"
+NODE_REPL_NODE_PATH = "/usr/lib/chatgpt/resources/cua_node/bin/node"
+NODE_REPL_TRUSTED_CODE_PATHS = "__CODEX_HOME__:/usr/lib/chatgpt/resources/cua_node/lib/node_modules"
+CODEX_HOME = "__CODEX_HOME__"
+BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab"
+BROWSER_USE_TINYSKY_ENABLED = "1"
+NODE_REPL_INSTRUCTIONS_USE_CASE_BROWSER = ""
+NODE_REPL_INSTRUCTIONS_USE_CASE_CHROME = ""
+BROWSER_USE_CODEX_APP_BUILD_FLAVOR = "prod"
+BROWSER_USE_CODEX_APP_VERSION = "26.901.20858"
+NODE_REPL_TRUSTED_SERVICES = '{"browser":"__CODEX_HOME__/plugins/cache/openai-bundled/browser/26.901.20858/scripts/browser-service.mjs"}'
+CODEX_CLI_PATH = "/usr/lib/chatgpt/resources/codex"
+
+[tui.model_availability_nux]
+gpt-6-astra = 1
