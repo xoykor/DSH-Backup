@@ -31,7 +31,7 @@ Informe brevemente: alvo e critério verificados, resultado observado, evidênci
 
 ## Integração nativa deste preset
 
-Esta skill é descoberta automaticamente pelo `skill-filesystem` do preset `Local Robust 9B`; não é necessário pedir um print a cada etapa. O carregador fornece a base do bundle quando a skill é carregada. Resolva o recurso relativo `scripts/capture-visual.mjs` contra essa base — não contra um cwd arbitrário — e execute-o pela interface de shell que a sessão realmente expuser (em PTC, pelo SDK gerado pelo próprio harness):
+Esta skill é descoberta automaticamente pelo `skill-filesystem` do preset `Local Robust 9B`; não é necessário pedir um print a cada etapa. O carregador fornece a base do bundle quando a skill é carregada. Resolva o recurso relativo `scripts/capture-visual.mjs` contra essa base — não contra um cwd arbitrário — e execute-o com a ferramenta `bash` nativa, passando o comando e o `workdir` como argumentos estruturados:
 
 ```text
 node "<base-dir-da-skill>/scripts/capture-visual.mjs" --target active-window --step before-fix --reason "verificar o alinhamento do painel"

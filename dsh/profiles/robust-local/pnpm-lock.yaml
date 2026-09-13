@@ -9,14 +9,14 @@ importers:
   .:
     dependencies:
       dsh-context-guard:
-        specifier: file:__DSH_HOME__/plugins/dsh-context-guard
-        version: file:../../plugins/dsh-context-guard
+        specifier: file:./.dsh-artifacts/dsh-context-guard/1.0.0
+        version: file:.dsh-artifacts/dsh-context-guard/1.0.0
 
 packages:
 
-  dsh-context-guard@file:../../plugins/dsh-context-guard:
-    resolution: {directory: ../../plugins/dsh-context-guard, type: directory}
+  dsh-context-guard@file:.dsh-artifacts/dsh-context-guard/1.0.0:
+    resolution: {directory: .dsh-artifacts/dsh-context-guard/1.0.0, type: directory}
 
 snapshots:
 
-  dsh-context-guard@file:../../plugins/dsh-context-guard: {}
+  dsh-context-guard@file:.dsh-artifacts/dsh-context-guard/1.0.0: {}

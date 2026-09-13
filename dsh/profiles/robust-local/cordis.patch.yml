@@ -16,6 +16,10 @@
     textSimilarity: 0.94
     resultFingerprintChars: 8000
 
+- id: compaction-basic
+  config:
+    maxTokens: 16384
+
 - id: settings
   config:
     path: __DSH_HOME__/profiles/robust-local/settings.yaml
@@ -85,3 +89,9 @@
     # The host half lets dsh-client-modules discover and serve lib/client.js.
     - id: client-ui-verification
       name: __DSH_HOME__/plugins/dsh-verification/packages/dsh-client-ui-verification/lib/index.js
+
+    # Browser automation control server (mirrors dsh-web-search-searxng).
+    - id: tool-browser
+      name: __DSH_HOME__/plugins/dsh-tool-browser/index.mjs
+      config:
+        baseURL: http://127.0.0.1:8731

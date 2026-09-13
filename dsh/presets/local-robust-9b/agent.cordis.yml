@@ -1,9 +1,10 @@
-# The `ptc` agent preset: the standard coding agent, presented as PTC mode.
+# The `local-robust-9b` agent preset: the standard coding agent, presented with
+# native tool schemas for the local Ornith model.
 #
 # Most of `standard` is here unchanged. The deliberate exception is the
-# general-purpose `workflow` tool: PTC mode uses `run_code` as its model-authored
-# composition surface. The `tool-presentation` row turns the remaining registry
-# into a generated SDK, so a sequence that would be five round trips becomes one.
+# general-purpose `workflow` tool remains disabled. Native presentation keeps
+# direct read, search, edit, write, shell, job, goal, and verification operations
+# visible through their declared schemas and result contracts.
 #
 # The registry itself stays on the host plane — the agent loop's scheduler and
 # the API proxy's presenters are its consumers — so what this preset owns is
@@ -47,8 +48,11 @@
       Do not repeat the same correction blindly. Compare each failure with earlier failures. If essentially the same error occurs three times, stop that strategy, reread the error, requirement, and diff, then form a substantially different hypothesis. After three different strategies without progress, use Goal blocked with a concrete technical reason instead of looping.
 
       Do not use Ralph. Do not use subagents or delegation. Work alone.
-      The run_code/Code tool evaluates a script body rather than an ES module: do not use static import or export there. Use the provided tools APIs, or dynamic await import(...) only when a module is genuinely required.
-      For long file contents, never embed the entire file in one string literal inside run_code. Write large files in small chunks (preferably no more than 4000 characters of file content per call), using tools.write for the first chunk and short tools.bash append/heredoc calls for subsequent chunks. Read a file before using edit. Verify each chunk before continuing; if a code call fails, do not resend the same large payload—reduce the chunk and retry with a materially smaller call.
+      Use the native tools directly with their declared structured arguments. Read a file before edit, keep writes targeted, and verify a write or edit with a follow-up read or deterministic test. Each bash call starts a fresh shell, so pass workdir and do not rely on state from an earlier call. Check the [exit code: N] marker on every bash result; a non-zero command exit is evidence to investigate, while an infrastructure error is a failed tool call.
+
+      Use read, glob, and grep to inspect; edit and write to change files; bash to execute shell commands; and job_output or job_kill to manage long-running work. Bash accepts Bash syntax; invoke another language explicitly when needed rather than sending its source as a different tool's input.
+
+      Native bash results are rendered as text. At an integration boundary that exposes the canonical result object, stdout and stderr are objects with text, truncated, and an optional spillPath; read the stream text through stdout.text or stderr.text, never stdout.trim(). Preserve command and file content exactly when passing structured arguments, and inspect the resulting state before retrying a call that may already have had an effect.
 
       Operating system: CachyOS / Arch Linux. Interactive shell: fish. Any command presented for the user to copy manually must be fish-compatible. When Bash is necessary, use bash -lc or an explicit #!/usr/bin/env bash script. DSH tools that explicitly execute Bash may use Bash syntax.
 
@@ -276,7 +280,7 @@
     - id: tool-workflow
       name: '@deepseek-ai/dsh-tool-workflow'
       # Keep the engine above for `ralph`, but do not publish a second
-      # model-authored orchestration surface beside `run_code` in PTC mode.
+      # model-authored orchestration surface beside the native tools.
       disabled: true
 
     - id: tool-ralph
@@ -306,10 +310,9 @@
 
 # ── presentation ────────────────────────────────────────────────────────────
 
-# PTC mode for this agent alone. The row waits for the host's `codeRuntime`
-# rather than assuming it: a deployment that composes no TypeScript runtime
-# fails this preset at mount, naming this id, instead of at the first request.
+# Native mode for this agent alone. It applies immediately and leaves each
+# visible tool's schema and result contract available to the model.
 - id: tool-presentation
   name: '@deepseek-ai/dsh-agent-tool-presentation'
   config:
-    mode: ptc
+    mode: native

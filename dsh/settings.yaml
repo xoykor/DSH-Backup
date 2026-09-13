@@ -26,6 +26,7 @@ llm-pi-ai:
       defaultContextWindow: 262144
       # Local reasoning can remain silent while the model is thinking; give
       # the stream watchdog more time and leave room for the final answer.
+      timeoutMs: 900000
       streamIdleTimeoutMs: 900000
       models:
         - id: ornith-1.5-9b
@@ -33,7 +34,8 @@ llm-pi-ai:
           maxTokens: 65536
         - id: qwen3.8-27b-gsq-rco
 agent-default-model:
-  provider: lmstudio
-  model: ornith-1.5-9b
+  provider: relay-codex
+  model: gpt-5.6-luna
+  reasoningEffort: max
 permission:
   defaultPreset: danger-full-access
