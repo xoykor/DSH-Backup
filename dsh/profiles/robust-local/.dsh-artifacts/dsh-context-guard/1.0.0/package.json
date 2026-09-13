@@ -1,0 +1,20 @@
+{
+  "name": "dsh-context-guard",
+  "version": "1.0.0",
+  "description": "Deterministic context-budget and loop guard for DeepSeek Harness local-model sessions.",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "files": [
+    "lib/index.js",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

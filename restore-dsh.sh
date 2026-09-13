@@ -238,6 +238,12 @@ snapshot_profiles() {
       esac
       snapshot_text "$file" "$dst/$base"
     done < <(find "$profile" -mindepth 1 -maxdepth 1 -type f -print0)
+    # Some profiles contain local bundle artifacts referenced by package.json.
+    # They are configuration source, not generated node_modules, and must be
+    # included so a restore does not leave file: dependencies dangling.
+    if [[ -d "$profile/.dsh-artifacts" ]]; then
+      copy_tree_snapshot "$profile/.dsh-artifacts" "$dst/.dsh-artifacts"
+    fi
   done < <(find "$src_root" -mindepth 1 -maxdepth 1 -type d -print0)
 }
 
@@ -434,6 +440,24 @@ restore_profiles() {
   done < <(find "$DSH_HOME/profiles" -mindepth 1 -maxdepth 1 -type d -print0)
 }
 
+restore_plugins() {
+  local plugin has_deps
+  while IFS= read -r -d '' plugin; do
+    [[ -f "$plugin/package.json" ]] || continue
+    has_deps="$(node -e 'const p=require(process.argv[1]); const groups=[p.dependencies,p.optionalDependencies,p.peerDependencies]; process.stdout.write(groups.some((group)=>group&&Object.keys(group).length>0)?"1":"0")' "$plugin/package.json")"
+    [[ "$has_deps" == "1" ]] || continue
+    log "installing plugin dependencies: $(basename -- "$plugin")"
+    (
+      cd -- "$plugin"
+      if [[ -f package-lock.json ]]; then
+        npm ci --legacy-peer-deps --ignore-scripts --no-fund --no-audit
+      else
+        npm install --legacy-peer-deps --ignore-scripts --no-fund --no-audit
+      fi
+    )
+  done < <(find "$DSH_HOME/plugins" -mindepth 1 -maxdepth 1 -type d -print0)
+}
+
 verify_saved_paths() {
   [[ -x "$DSH_BIN" ]] || die "DSH executable is missing: $DSH_BIN"
   [[ -d "$DSH_HOME/profiles" ]] || die "profiles directory is missing: $DSH_HOME/profiles"
@@ -519,6 +543,7 @@ restore_current() {
     copy_tree_restore "$REPO_DIR/codex/plugins/personal" "$CODEX_HOME/plugins/cache/personal"
   fi
 
+  restore_plugins
   restore_profiles
   verify_saved_paths
   log "restore complete"
