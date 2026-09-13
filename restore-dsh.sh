@@ -391,6 +391,48 @@ prepare_restore_backup() {
   mkdir -p "$RESTORE_BACKUP_ROOT"
 }
 
+install_desktop_launcher() {
+  local applications_dir icon_dir desktop_file icon_src
+  applications_dir="$HOME/.local/share/applications"
+  icon_dir="$HOME/.local/share/icons/hicolor/scalable/apps"
+  desktop_file="$applications_dir/deepseek-harness.desktop"
+
+  mkdir -p "$applications_dir" "$icon_dir"
+
+  icon_src="$(find "$DSH_INSTALL_PREFIX/lib/dsh-runtime-$DSH_VERSION/node_modules" \
+    -path '*/@deepseek-ai/dsh-web-frontend/dist/favicon.svg' \
+    -type f -print -quit 2>/dev/null || true)"
+
+  if [[ -n "$icon_src" && -f "$icon_src" ]]; then
+    cp -- "$icon_src" "$icon_dir/deepseek-harness.svg"
+  else
+    warn "official DSH favicon not found; launcher will use a generic application icon"
+  fi
+
+  cat > "$desktop_file" <<EOF
+[Desktop Entry]
+Type=Application
+Name=DeepSeek Harness
+Comment=DeepSeek Harness Web Interface
+Exec=$DSH_INSTALL_PREFIX/bin/dsh web
+Icon=deepseek-harness
+Terminal=false
+Categories=Development;Utility;
+StartupNotify=true
+EOF
+
+  chmod +x "$desktop_file"
+
+  if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database "$applications_dir" >/dev/null 2>&1 || true
+  fi
+  if command -v kbuildsycoca6 >/dev/null 2>&1; then
+    kbuildsycoca6 >/dev/null 2>&1 || true
+  fi
+
+  log "desktop launcher installed: $desktop_file"
+}
+
 stage_existing() {
   local path="$1"
   local relative="$2"
@@ -545,6 +587,7 @@ restore_current() {
 
   restore_plugins
   restore_profiles
+  install_desktop_launcher
   verify_saved_paths
   log "restore complete"
   log "managed paths were backed up at $RESTORE_BACKUP_ROOT"
