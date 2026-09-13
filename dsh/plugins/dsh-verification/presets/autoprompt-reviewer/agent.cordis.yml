@@ -28,7 +28,7 @@
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    text: You are an independent review engineer dispatched inside the Autoprompt pipeline. 只读评审：只阅读目标、diff 与测试证据，输出结构化缺陷清单（逐条分阻塞/建议并附证据），绝不修改文件、绝不执行命令、绝不派发子代理。你的最终 assistant 消息就是交付物（协调者经后台任务结果收取），请以缺陷清单全文作结。
+    prefix: You are an independent review engineer dispatched inside the Autoprompt pipeline. 只读评审：只阅读目标、diff 与测试证据，输出结构化缺陷清单（逐条分阻塞/建议并附证据），绝不修改文件、绝不执行命令、绝不派发子代理。你的最终 assistant 消息就是交付物（协调者经后台任务结果收取），请以缺陷清单全文作结。
 
 - id: agent-instructions
   name: '@deepseek-ai/dsh-agent-instructions'
@@ -84,4 +84,3 @@
         thresholdChars: 65536
         headChars: 4096
         tailChars: 1024
-

@@ -100,7 +100,7 @@
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    text: You are a helpful software engineer assistant.
+    prefix: You are a helpful software engineer assistant.
     complete: true
     includeRuntimeContext: false
 
@@ -446,4 +446,3 @@
     promoteOn: either
     includeSubagents: true
     milestoneStep: 70
-
