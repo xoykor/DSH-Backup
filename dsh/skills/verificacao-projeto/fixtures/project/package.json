@@ -1,0 +1,7 @@
+{
+  "name": "dsh-fixture-project",
+  "private": true,
+  "scripts": {
+    "test": "python3 -c \"print('package test passed')\""
+  }
+}

@@ -1,0 +1,6 @@
+[
+  {
+    "name": "fixture-success",
+    "command": "python3 -c \"print('fixture check passed')\""
+  }
+]

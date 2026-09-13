@@ -1,0 +1,17 @@
+{
+  "question": "Qual é a fonte primária para a especificação consultada?",
+  "consulted_at": "2026-09-13",
+  "claims": [
+    {
+      "text": "A especificação publicada descreve o comportamento indicado.",
+      "kind": "fact",
+      "sources": [
+        {
+          "url": "https://example.org/spec",
+          "title": "Especificação publicada",
+          "evidence": "Trecho copiado da página consultada, com contexto suficiente."
+        }
+      ]
+    }
+  ]
+}
