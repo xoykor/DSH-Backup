@@ -1,15 +1,15 @@
 # Isolated robust-local host policy. This layer does not affect other profiles.
 - id: context-guard
   config:
-    economyTokens: 131072
-    checkpointTokens: 163840
-    compactTokens: 188743
+    economyTokens: 65536
+    checkpointTokens: 81920
+    compactTokens: 94371
     noProgressLimit: 3
     equivalentBlockLimit: 5
     maxTurnSteps: 48
     maxTurnToolCalls: 48
     maxTurnMs: 900000
-    maxTurnTokens: 240000
+    maxTurnTokens: 120000
     diagnosticMaxCalls: 3
     diagnosticMaxMs: 120000
     diagnosticMaxTokens: 24000
