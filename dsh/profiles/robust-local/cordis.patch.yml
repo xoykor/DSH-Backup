@@ -11,7 +11,6 @@
     maxTurnMs: 900000
     diagnosticMaxCalls: 3
     diagnosticMaxMs: 120000
-    diagnosticMaxTokens: 24000
     textSimilarity: 0.94
     resultFingerprintChars: 8000
 

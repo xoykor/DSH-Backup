@@ -19,7 +19,7 @@ const DEFAULTS = Object.freeze({
   maxTurnTokens: undefined,
   diagnosticMaxCalls: 3,
   diagnosticMaxMs: 120_000,
-  diagnosticMaxTokens: 24_000,
+  diagnosticMaxTokens: undefined,
   textSimilarity: 0.94,
   resultFingerprintChars: 8_000,
 });
@@ -61,7 +61,9 @@ function resolveConfig(raw = {}) {
       : undefined,
     diagnosticMaxCalls: positiveInteger(raw.diagnosticMaxCalls, DEFAULTS.diagnosticMaxCalls, 'diagnosticMaxCalls'),
     diagnosticMaxMs: positiveInteger(raw.diagnosticMaxMs, DEFAULTS.diagnosticMaxMs, 'diagnosticMaxMs'),
-    diagnosticMaxTokens: positiveInteger(raw.diagnosticMaxTokens, DEFAULTS.diagnosticMaxTokens, 'diagnosticMaxTokens'),
+    diagnosticMaxTokens: raw.diagnosticMaxTokens !== undefined
+      ? positiveInteger(raw.diagnosticMaxTokens, undefined, 'diagnosticMaxTokens')
+      : undefined,
     textSimilarity: raw.textSimilarity ?? DEFAULTS.textSimilarity,
     resultFingerprintChars: positiveInteger(raw.resultFingerprintChars, DEFAULTS.resultFingerprintChars, 'resultFingerprintChars'),
   };
@@ -701,7 +703,7 @@ export function apply(ctx, rawConfig = {}) {
         return 'CONTEXT-GUARD STOPPED: diagnostic mode exhausted its budget of '
           + config.diagnosticMaxCalls + ' calls.';
       }
-      if (tokenUsage !== undefined && tokenUsage - state.diagnosticTokenBaseline >= config.diagnosticMaxTokens) {
+      if (config.diagnosticMaxTokens !== undefined && tokenUsage !== undefined && tokenUsage - state.diagnosticTokenBaseline >= config.diagnosticMaxTokens) {
         return 'CONTEXT-GUARD STOPPED: diagnostic mode exhausted its reduced token budget of '
           + config.diagnosticMaxTokens + ' tokens.';
       }

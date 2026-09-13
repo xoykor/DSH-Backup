@@ -30,3 +30,5 @@ codex/*history*
 
 # Local restore artifacts
 .restore-backups/
+*.pre-fix
+*.bak
