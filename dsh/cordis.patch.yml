@@ -12,12 +12,19 @@
   disabled: false
   config:
     auto: true
-    thresholdRatio: 0.918426513671875
-    retainTokens: 6000
+    thresholdRatio: 0.72
+    retainTokens: 32000
     maxTokens: 16384
     compactionRetries: 1
     maxOverflowRetries: 1
     modelPolicies:
+      - provider: lmstudio
+        model: ornith-1.5-9b
+        thresholdRatio: 0.72
+        retainTokens: 32000
+        maxTokens: 16384
+        compactionRetries: 1
+        maxOverflowRetries: 1
       - provider: lmstudio
         model: qwen3.8-27b-gsq-rco
         thresholdRatio: 0.918426513671875
@@ -40,3 +47,21 @@
 - insert:
     - id: qwen-request-defaults
       name: __DSH_HOME__/plugins/dsh-qwen-defaults/lib/index.js
+
+# Explicit local robust defaults for every host loading context-guard.
+- id: context-guard
+  config:
+    economyTokens: 131072
+    checkpointTokens: 163840
+    compactTokens: 188743
+    noProgressLimit: 3
+    equivalentBlockLimit: 5
+    maxTurnSteps: 48
+    maxTurnToolCalls: 48
+    maxTurnMs: 900000
+    maxTurnTokens: 240000
+    diagnosticMaxCalls: 3
+    diagnosticMaxMs: 120000
+    diagnosticMaxTokens: 24000
+    textSimilarity: 0.94
+    resultFingerprintChars: 8000

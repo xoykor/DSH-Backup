@@ -8,20 +8,20 @@ export const name = 'dsh-context-guard';
 export const inject = ['tools', 'tokenMeter'];
 
 const DEFAULTS = Object.freeze({
-  economyTokens: 20_000,
-  checkpointTokens: 25_000,
-  compactTokens: 30_000,
+  economyTokens: 131_072,
+  checkpointTokens: 163_840,
+  compactTokens: 188_743,
   noProgressLimit: 3,
   equivalentBlockLimit: 5,
   maxTurnSteps: 48,
   maxTurnToolCalls: 48,
   maxTurnMs: 900_000,
-  maxTurnTokens: 180_000,
+  maxTurnTokens: 240_000,
   diagnosticMaxCalls: 3,
   diagnosticMaxMs: 120_000,
   diagnosticMaxTokens: 24_000,
   textSimilarity: 0.94,
-  resultFingerprintChars: 4_000,
+  resultFingerprintChars: 8_000,
 });
 
 function positiveInteger(value, fallback, label) {

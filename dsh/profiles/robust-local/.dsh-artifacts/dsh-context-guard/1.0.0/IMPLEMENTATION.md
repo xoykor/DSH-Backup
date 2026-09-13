@@ -1,6 +1,8 @@
 # Guard DSH — implementação
 
-Escopo: cópia de desenvolvimento em `work/dsh-improvement/guard`. A instalação em `__HOME__/.local/lib/node_modules/@deepseek-ai/dsh` não foi modificada.
+Escopo: implementação stage-final promovida para a instalação local em
+`~/.dsh/plugins/dsh-context-guard` e nos perfis `web`, `headless` e
+`robust-local`.
 
 API revisada: DSH `0.1.2-rc.1`, com `tools.guard`, `tools/post-execute`, `agent/pre-step`, `agent/turn-stopping`, `session/event` e `Agent.cancel(cause, { keepInbox: true })`. O contrato de `TokenMeter.measure()` foi confirmado no pacote local: `totalTokens` é pressão atual da superfície medida.
 

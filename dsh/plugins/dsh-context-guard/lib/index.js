@@ -8,20 +8,20 @@ export const name = 'dsh-context-guard';
 export const inject = ['tools', 'tokenMeter'];
 
 const DEFAULTS = Object.freeze({
-  economyTokens: 20_000,
-  checkpointTokens: 25_000,
-  compactTokens: 30_000,
+  economyTokens: 131_072,
+  checkpointTokens: 163_840,
+  compactTokens: 188_743,
   noProgressLimit: 3,
   equivalentBlockLimit: 5,
   maxTurnSteps: 48,
   maxTurnToolCalls: 48,
   maxTurnMs: 900_000,
-  maxTurnTokens: 180_000,
+  maxTurnTokens: 240_000,
   diagnosticMaxCalls: 3,
   diagnosticMaxMs: 120_000,
   diagnosticMaxTokens: 24_000,
   textSimilarity: 0.94,
-  resultFingerprintChars: 4_000,
+  resultFingerprintChars: 8_000,
 });
 
 function positiveInteger(value, fallback, label) {
@@ -33,6 +33,20 @@ function positiveInteger(value, fallback, label) {
 }
 
 function resolveConfig(raw = {}) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error('dsh-context-guard: configuration must be an object');
+  }
+  const knownKeys = new Set([
+    'economyTokens', 'checkpointTokens', 'compactTokens', 'noProgressLimit',
+    'equivalentBlockLimit', 'maxTurnSteps', 'maxTurnToolCalls', 'maxTurnMs',
+    'maxTurnTokens', 'diagnosticMaxCalls', 'diagnosticMaxMs',
+    'diagnosticMaxTokens', 'textSimilarity', 'resultFingerprintChars',
+  ]);
+  for (const key of Object.keys(raw)) {
+    if (!knownKeys.has(key)) {
+      throw new Error('dsh-context-guard: unknown configuration key "' + key + '"');
+    }
+  }
   const config = {
     economyTokens: positiveInteger(raw.economyTokens, DEFAULTS.economyTokens, 'economyTokens'),
     checkpointTokens: positiveInteger(raw.checkpointTokens, DEFAULTS.checkpointTokens, 'checkpointTokens'),
@@ -66,7 +80,6 @@ function stable(value) {
   if (value && typeof value === 'object') {
     return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]));
   }
-  if (typeof value === 'string') return value.trim().replace(/\s+/g, ' ');
   return value;
 }
 
@@ -74,7 +87,7 @@ function canonical(value) {
   try {
     return JSON.stringify(stable(value));
   } catch {
-    return String(value).trim().replace(/\s+/g, ' ');
+    return String(value);
   }
 }
 
@@ -129,27 +142,15 @@ const COMMAND_TOOLS = new Set([
   'code',
 ]);
 
-const DIAGNOSTIC_TOOLS = new Set([
-  'read',
-  'read_file',
-  'list_dir',
-  'glob',
-  'grep',
-  'search',
-  'find',
-  'inspect',
-  'get_goal',
-  'get_verification_plan',
-  'web_search',
-  'web_fetch',
-  'read_page',
-  ...COMMAND_TOOLS,
-]);
-
-function isDiagnosticTool(name) {
-  const normalized = String(name).toLowerCase();
-  return DIAGNOSTIC_TOOLS.has(normalized)
-    || /^(read|grep|search|list|glob|find|get_|inspect|web_search|web_fetch)/.test(normalized);
+function hasReadOnlyCapability(exec) {
+  // Read-only is executor metadata, never inferred from a tool name or source
+  // text. The DSH ToolExecution contract currently has no built-in field, so a
+  // host that wants timeout diagnosis must explicitly attach one of these
+  // capability shapes at its policy boundary.
+  return exec?.readOnly === true
+    || exec?.capabilities?.readOnly === true
+    || exec?.capability?.readOnly === true
+    || exec?.definition?.readOnly === true;
 }
 
 function identityArguments(argumentsValue) {
@@ -180,7 +181,9 @@ function semanticActionKey(name, argumentsValue) {
   const subject = args && typeof args === 'object'
     ? (args.command ?? args.code ?? args.path ?? args.file ?? args.query ?? '')
     : '';
-  const subjectText = String(subject).replace(/\s+/g, ' ').trim().slice(0, 240);
+  // Keep command/content bytes intact for semantic cycle identity. The
+  // bounded slice is only a memory cap; whitespace is not a delimiter here.
+  const subjectText = String(subject).slice(0, 240);
   if (files.length > 0) {
     return normalizedName + '|' + files.join('|') + (COMMAND_TOOLS.has(normalizedName) ? '|' + subjectText : '');
   }
@@ -194,6 +197,91 @@ function isCommandTool(name) {
 function commandArgument(argumentsValue) {
   if (!argumentsValue || typeof argumentsValue !== 'object') return '';
   return String(argumentsValue.command ?? argumentsValue.code ?? '').trim();
+}
+
+function normalizedErrorText(value) {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/0x[\da-f]+/gi, '<hex>')
+    .replace(/(?:line|column|col|offset|position)\s*[:=]?\s*\d+/g, '$1:<n>')
+    .replace(/\b\d+\b/g, '<n>')
+    .replace(/(?:\/[^\s:'"]+)+/g, '<path>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function resultErrorCause(result) {
+  const value = result?.value;
+  return value?.code ?? value?.errorCode ?? value?.reason ?? value?.error
+    ?? result?.error?.code ?? result?.error?.message
+    ?? (Array.isArray(result?.content) ? result.content.map((block) => block?.text ?? '').join(' ') : '');
+}
+
+function commandFailureEvidence(result, toolName) {
+  if (result?.isError === true || timeoutEvidence(result, toolName)) return true;
+  if (!isCommandTool(toolName)) return false;
+  const value = result?.value;
+  const exitCode = value?.exitCode ?? value?.exit_code;
+  if (Number.isFinite(exitCode) && exitCode !== 0) return true;
+  if (value?.signal !== undefined && value.signal !== null && value.signal !== '') return true;
+  if (value?.aborted === true || value?.sandboxDenied === true || value?.sandbox_denied === true
+    || value?.permissionDenied === true || value?.permission_denied === true) return true;
+  const text = toolResultText(result, 4_000).toLowerCase();
+  return /sandbox\s+(?:denied|violation)|permission denied|access denied|not permitted/.test(text);
+}
+
+function errorFamily(toolName, argumentsValue, result) {
+  if (result?.isError !== true && !commandFailureEvidence(result, toolName)) return undefined;
+  const cause = normalizedErrorText(resultErrorCause(result));
+  let stage = 'other';
+  if (timeoutEvidence(result, toolName) || /timeout|timed out|etimedout/.test(cause)) stage = 'timeout';
+  else if (/parse|syntax|unicode escape|type-strip|unexpected token/.test(cause)) stage = 'parse';
+  else if (/type error|undefined|null is not|not a function|cannot read/.test(cause)) stage = 'type';
+  else if (result?.value?.sandboxDenied === true || result?.value?.sandbox_denied === true
+    || result?.value?.permissionDenied === true || result?.value?.permission_denied === true
+    || /permission|eacces|eperm|access denied|sandbox|not permitted|denied/.test(cause)) stage = 'permission';
+  else if (/network|connection|enotfound|econn|http\s*[45]\d\d/.test(cause)) stage = 'network';
+  else if (/validation|invalid argument|schema|unknown key/.test(cause)) stage = 'validation';
+  const refs = fileReferences(argumentsValue).join('|');
+  // Keep the class and resource, while dropping changing stack locations and
+  // prose. The full result remains in the normal tool log for diagnosis.
+  return String(toolName).toLowerCase() + '|' + stage + '|' + refs;
+}
+
+function errorFamilyHint(toolName, argumentsValue) {
+  const text = normalizedErrorText(commandArgument(argumentsValue));
+  let stage = 'other';
+  if (/timeout|timed out|etimedout/.test(text)) stage = 'timeout';
+  else if (/parse|syntax|unicode escape|type-strip|unexpected token|bad syntax/.test(text)) stage = 'parse';
+  else if (/type error|undefined|null is not|not a function|cannot read/.test(text)) stage = 'type';
+  return String(toolName).toLowerCase() + '|' + stage;
+}
+
+function observedMutationChange(result) {
+  if (result?.isError === true) return false;
+  const candidates = [result, result?.value, result?.meta];
+  for (const value of candidates) if (value && typeof value === 'object') {
+    if (value.changed === true || value.modified === true || value.written === true) return true;
+    if (Array.isArray(value.changedFiles) && value.changedFiles.length > 0) return true;
+    if (value.before !== undefined && value.after !== undefined && canonical(value.before) !== canonical(value.after)) return true;
+    if (value.beforeHash !== undefined && value.afterHash !== undefined && value.beforeHash !== value.afterHash) return true;
+    if (value.revision !== undefined || value.newRevision !== undefined) return true;
+  }
+  return false;
+}
+
+function tokenUsageAmount(usage) {
+  if (!usage || typeof usage !== 'object') return undefined;
+  const total = usage.totalTokens;
+  const parts = [
+    usage.inputTokens, usage.outputTokens, usage.cacheReadTokens,
+    usage.cacheWriteTokens,
+  ];
+  if (Number.isFinite(total) && total > 0) return total;
+  if (!parts.some((part) => Number.isFinite(part))) {
+    return Number.isFinite(total) && total >= 0 ? total : undefined;
+  }
+  return parts.reduce((sum, part) => sum + (Number.isFinite(part) && part >= 0 ? part : 0), 0);
 }
 
 function isWorkspaceMutationCall(name, argumentsValue) {
@@ -269,22 +357,32 @@ function createState() {
   return {
     actionCounts: new Map(),
     stagnantActionCounts: new Map(),
+    failureFamilyCounts: new Map(),
+    failureFamilyVersion: new Map(),
+    lastFailureFamily: '',
+    lastResultByAction: new Map(),
     actionSamples: [],
-    seenResults: new Set(),
     actionHistory: [],
     noProgress: 0,
     lastAssistantText: '',
     repeatedAssistantText: false,
     currentTurn: null,
     currentStep: 0,
+    logicalStartedAt: 0,
+    logicalSteps: 0,
     turnStartedAt: 0,
     turnActive: false,
     turnCalls: 0,
+    inFlightCalls: 0,
     turnTokenBaseline: null,
     turnTokenUsage: 0,
+    reportedTokenUsage: 0,
+    hasReportedTokenUsage: false,
+    meterHighWater: 0,
     changeVersion: 0,
     mode: 'idle',
     stopReason: '',
+    cancelFailed: false,
     timeoutRecord: null,
     diagnosticCalls: 0,
     diagnosticStartedAt: 0,
@@ -306,9 +404,11 @@ export function apply(ctx, rawConfig = {}) {
   const stateFor = (agent) => {
     let state = states.get(agent);
     if (!state) {
-      state = createState();
+      const sessionId = agent?.session?.id === undefined ? undefined : String(agent.session.id);
+      state = sessionId === undefined ? undefined : sessionStates.get(sessionId);
+      if (!state) state = createState();
       states.set(agent, state);
-      if (agent?.session?.id !== undefined) sessionStates.set(String(agent.session.id), state);
+      if (sessionId !== undefined) sessionStates.set(sessionId, state);
     }
     return state;
   };
@@ -335,11 +435,18 @@ export function apply(ctx, rawConfig = {}) {
   };
 
   const updateTokenUsage = (state, agent) => {
+    if (state.hasReportedTokenUsage) {
+      state.turnTokenUsage = Math.max(state.turnTokenUsage, state.reportedTokenUsage);
+      return state.turnTokenUsage;
+    }
     const total = readTokenTotal(agent);
     if (total === undefined) return undefined;
     if (state.turnTokenBaseline === null) state.turnTokenBaseline = total;
     const usage = Math.max(0, total - state.turnTokenBaseline);
-    state.turnTokenUsage = Math.max(state.turnTokenUsage, usage);
+    // `measure().totalTokens` is current context pressure. Keep a monotonic
+    // high-water fallback so compaction cannot make the hard limit go down.
+    state.meterHighWater = Math.max(state.meterHighWater, usage);
+    state.turnTokenUsage = Math.max(state.turnTokenUsage, state.meterHighWater);
     return state.turnTokenUsage;
   };
 
@@ -347,6 +454,7 @@ export function apply(ctx, rawConfig = {}) {
     if (state.mode === 'stopped' || state.mode === 'paused') return;
     state.mode = mode;
     state.stopReason = reason;
+    state.cancelFailed = false;
     state.turnActive = false;
     clearTurnTimers(state);
 
@@ -359,40 +467,60 @@ export function apply(ctx, rawConfig = {}) {
         }
       } catch {
         // The turn may already be at its driver boundary; the guard still
-        // denies every subsequent tool call using the terminal state above.
+        // denies every subsequent tool call, while exposing cancellation
+        // uncertainty in the durable stop reason.
+        state.cancelFailed = true;
+        state.stopReason = reason + ' Agent cancellation could not be confirmed.';
       }
     }
   };
 
-  const startTurn = (agent, state, turn, step) => {
+  const startTurn = (agent, state, turn, step, humanAuthorization = false) => {
+    const newLogicalExecution = state.currentTurn === null || humanAuthorization;
     clearTurnTimers(state);
+    if (newLogicalExecution) {
+      state.logicalStartedAt = Date.now();
+      state.logicalSteps = 0;
+      state.turnCalls = 0;
+      state.inFlightCalls = 0;
+      state.turnTokenBaseline = readTokenTotal(agent) ?? null;
+      state.turnTokenUsage = 0;
+      state.reportedTokenUsage = 0;
+      state.hasReportedTokenUsage = false;
+      state.meterHighWater = 0;
+      state.changeVersion = 0;
+      state.mode = 'normal';
+      state.stopReason = '';
+      state.cancelFailed = false;
+      state.timeoutRecord = null;
+      state.diagnosticCalls = 0;
+      state.diagnosticStartedAt = 0;
+      state.diagnosticTokenBaseline = 0;
+      state.diagnosticNoticeIssued = false;
+      state.noProgress = 0;
+      state.lastAssistantText = '';
+      state.repeatedAssistantText = false;
+      state.actionCounts.clear();
+      state.stagnantActionCounts.clear();
+      state.actionSamples.length = 0;
+      state.failureFamilyCounts.clear();
+      state.failureFamilyVersion.clear();
+      state.lastFailureFamily = '';
+      state.lastResultByAction.clear();
+      state.actionHistory.length = 0;
+      state.economyNoticed = false;
+      state.checkpointNoticed = false;
+      state.compactNoticed = false;
+    } else if (state.mode === 'idle') {
+      state.mode = 'normal';
+    }
     state.currentTurn = turn;
     state.currentStep = step;
-    state.turnStartedAt = Date.now();
+    state.turnStartedAt = state.logicalStartedAt;
     state.turnActive = true;
-    state.turnCalls = 0;
-    state.turnTokenBaseline = readTokenTotal(agent) ?? null;
-    state.turnTokenUsage = 0;
-    state.changeVersion = 0;
-    state.mode = 'normal';
-    state.stopReason = '';
-    state.timeoutRecord = null;
-    state.diagnosticCalls = 0;
-    state.diagnosticStartedAt = 0;
-    state.diagnosticTokenBaseline = 0;
-    state.diagnosticNoticeIssued = false;
-    state.noProgress = 0;
-    state.lastAssistantText = '';
-    state.repeatedAssistantText = false;
-    state.actionCounts.clear();
-    state.stagnantActionCounts.clear();
-    state.actionSamples.length = 0;
-    state.seenResults.clear();
-    state.actionHistory.length = 0;
-    state.economyNoticed = false;
-    state.checkpointNoticed = false;
-    state.compactNoticed = false;
+    state.logicalSteps += 1;
 
+    const remainingMs = Math.max(0, config.maxTurnMs - (Date.now() - state.logicalStartedAt));
     state.turnTimer = setTimeout(() => {
       if (state.currentTurn !== turn || !state.turnActive) return;
       if (state.mode !== 'normal' && state.mode !== 'diagnostic') return;
@@ -402,8 +530,24 @@ export function apply(ctx, rawConfig = {}) {
         'CONTEXT-GUARD STOPPED: the turn exceeded its total time budget of '
           + config.maxTurnMs + 'ms; active executor work was cancelled.',
       );
-    }, config.maxTurnMs);
+    }, remainingMs);
     state.turnTimer.unref?.();
+    if (state.mode === 'diagnostic' && state.diagnosticStartedAt > 0) {
+      const diagnosticRemainingMs = Math.max(
+        0,
+        config.diagnosticMaxMs - (Date.now() - state.diagnosticStartedAt),
+      );
+      state.diagnosticTimer = setTimeout(() => {
+        if (state.currentTurn !== turn || !state.turnActive || state.mode !== 'diagnostic') return;
+        stopTurn(
+          agent,
+          state,
+          'CONTEXT-GUARD STOPPED: diagnostic mode exceeded its reduced time budget of '
+            + config.diagnosticMaxMs + 'ms; active executor work was cancelled.',
+        );
+      }, diagnosticRemainingMs);
+      state.diagnosticTimer.unref?.();
+    }
   };
 
   const enterDiagnostic = (agent, state, exec, result, resultFingerprint) => {
@@ -497,9 +641,9 @@ export function apply(ctx, rawConfig = {}) {
     state.turnCalls += 1;
 
     if (state.mode === 'diagnostic') {
-      if (!isDiagnosticTool(exec.name)) {
-        return 'CONTEXT-GUARD BLOCKED: diagnostic mode permits only bounded '
-          + 'inspection and test-diagnosis tools; this call is outside that allowlist.';
+      if (!hasReadOnlyCapability(exec)) {
+        return 'CONTEXT-GUARD BLOCKED: diagnostic mode requires an explicit '
+          + 'read-only executor capability; tool names and command text are not sufficient.';
       }
       if (
         state.timeoutRecord
@@ -526,6 +670,23 @@ export function apply(ctx, rawConfig = {}) {
       && similarity(sample.args, args) >= config.textSimilarity
     ));
 
+    const familyHint = errorFamilyHint(exec.name, exec.arguments);
+    const sameToolFallback = familyHint.endsWith('|other')
+      && state.lastFailureFamily.startsWith(String(exec.name).toLowerCase() + '|');
+    const familyCount = (state.lastFailureFamily.startsWith(familyHint) || sameToolFallback)
+      ? (state.failureFamilyCounts.get(state.lastFailureFamily) ?? 0)
+      : 0;
+    if (
+      familyCount >= config.noProgressLimit
+      && state.failureFamilyVersion.get(state.lastFailureFamily) === state.changeVersion
+    ) {
+      const reason = 'CONTEXT-GUARD STOPPED: ' + exec.name
+        + ' produced ' + familyCount + ' equivalent failures in the '
+        + state.lastFailureFamily.split('|')[1] + ' family without an observed change.';
+      stopTurn(exec.agent, state, reason);
+      return reason;
+    }
+
     if (stagnantAttempts >= config.equivalentBlockLimit) {
       const reason = 'CONTEXT-GUARD STOPPED: ' + exec.name
         + ' reached ' + config.equivalentBlockLimit
@@ -534,7 +695,7 @@ export function apply(ctx, rawConfig = {}) {
       stopTurn(exec.agent, state, reason);
       return reason;
     }
-    if (state.noProgress >= config.noProgressLimit) {
+    if (state.noProgress >= config.noProgressLimit && (state.lastFailureFamily === '' || familyCount > 0)) {
       const reason = 'CONTEXT-GUARD PAUSE: ' + state.noProgress
         + ' consecutive actions produced no new executor evidence. The executor '
         + 'closed the turn; inspect the latest failure in a new user turn.'
@@ -542,13 +703,17 @@ export function apply(ctx, rawConfig = {}) {
       stopTurn(exec.agent, state, reason, 'paused');
       return reason;
     }
+    state.inFlightCalls += 1;
     return undefined;
   });
 
   ctx.on('tools/post-execute', async (exec, result, next) => {
-    const downstream = await next();
-    if (!exec.agent || isGuardResult(result)) return downstream;
+    if (!exec.agent) return next();
     const state = stateFor(exec.agent);
+    const denied = isGuardResult(result);
+    if (!denied) state.inFlightCalls = Math.max(0, state.inFlightCalls - 1);
+    const downstream = await next();
+    if (denied) return downstream;
     const args = canonical(identityArguments(exec.arguments));
     const key = String(exec.name) + '\u0000' + args;
     const attempts = (state.actionCounts.get(key) ?? 0) + 1;
@@ -557,16 +722,39 @@ export function apply(ctx, rawConfig = {}) {
     if (state.actionSamples.length > 32) state.actionSamples.shift();
 
     const fingerprint = toolResultText(result, config.resultFingerprintChars);
-    const isNewResult = !state.seenResults.has(fingerprint);
-    state.seenResults.add(fingerprint);
-    if (isNewResult) state.stagnantActionCounts.set(key, 0);
-    else state.stagnantActionCounts.set(key, (state.stagnantActionCounts.get(key) ?? 0) + 1);
+    const previousFingerprint = state.lastResultByAction.get(key);
+    const isNewResult = previousFingerprint === undefined || previousFingerprint !== fingerprint;
+    state.lastResultByAction.set(key, fingerprint);
+    const family = errorFamily(exec.name, exec.arguments, result);
+    if (family !== undefined) {
+      const previousFamily = state.lastFailureFamily;
+      const familyCount = (state.failureFamilyCounts.get(family) ?? 0) + 1;
+      state.failureFamilyCounts.set(family, familyCount);
+      state.failureFamilyVersion.set(family, state.changeVersion);
+      state.lastFailureFamily = family;
+      // Changing the wording, line, or stack of an equivalent failure does
+      // not constitute progress. A different failure class starts a separate
+      // bounded investigation budget.
+      state.noProgress = previousFamily === family ? state.noProgress + 1 : 1;
+      state.stagnantActionCounts.set(key, (state.stagnantActionCounts.get(key) ?? 0) + 1);
+    } else if (isNewResult) {
+      state.noProgress = 0;
+      state.lastFailureFamily = '';
+      state.stagnantActionCounts.set(key, 0);
+    } else {
+      state.noProgress += 1;
+      state.stagnantActionCounts.set(key, (state.stagnantActionCounts.get(key) ?? 0) + 1);
+    }
     if (
-      result?.isError !== true
-      && isWorkspaceMutationCall(exec.name, exec.arguments)
-      && isNewResult
+      isWorkspaceMutationCall(exec.name, exec.arguments)
+      && observedMutationChange(result)
     ) {
       state.changeVersion += 1;
+      state.failureFamilyCounts.clear();
+      state.failureFamilyVersion.clear();
+      state.stagnantActionCounts.clear();
+      state.noProgress = 0;
+      state.lastFailureFamily = '';
     }
 
     state.actionHistory.push({
@@ -588,13 +776,6 @@ export function apply(ctx, rawConfig = {}) {
       enterDiagnostic(exec.agent, state, exec, result, fingerprint);
     }
 
-    if (isNewResult) {
-      state.noProgress = 0;
-      state.repeatedAssistantText = false;
-    } else {
-      state.noProgress += 1;
-    }
-
     if (hasRepeatedCycle(state.actionHistory)) {
       stopTurn(
         exec.agent,
@@ -606,7 +787,7 @@ export function apply(ctx, rawConfig = {}) {
     }
 
     const tokenUsage = updateTokenUsage(state, exec.agent);
-    if (state.turnCalls >= config.maxTurnToolCalls) {
+    if (state.turnCalls >= config.maxTurnToolCalls && state.inFlightCalls === 0) {
       stopTurn(
         exec.agent,
         state,
@@ -637,7 +818,20 @@ export function apply(ctx, rawConfig = {}) {
   ctx.on('session/event', (session, event) => {
     if (event.type !== 'assistant/message') return;
     const state = sessionStates.get(String(session.id));
-    if (!state || state.mode === 'stopped' || state.mode === 'paused') return;
+    if (!state) return;
+    if (event.data?.turn === state.currentTurn) {
+      const amount = tokenUsageAmount(event.data?.usage);
+      if (amount !== undefined) {
+        // Provider usage is per request. Summing it is stable across context
+        // compaction, unlike the meter's current-pressure measurement.
+        if (amount > 0) {
+          state.reportedTokenUsage += amount;
+          state.hasReportedTokenUsage = true;
+          state.turnTokenUsage = Math.max(state.turnTokenUsage, state.reportedTokenUsage);
+        }
+      }
+    }
+    if (state.mode === 'stopped' || state.mode === 'paused') return;
     const text = (event.data?.message?.content ?? [])
       .filter((block) => block?.type === 'text')
       .map((block) => block.text)
@@ -651,16 +845,20 @@ export function apply(ctx, rawConfig = {}) {
     state.lastAssistantText = normalized;
   });
 
-  ctx.on('agent/pre-step', async ({ agent, signal, turn, step }, next) => {
+  ctx.on('agent/pre-step', async ({ agent, signal, turn, step, messages }, next) => {
     if (!agent) return next();
     const state = stateFor(agent);
-    if (state.currentTurn !== turn) startTurn(agent, state, turn, step);
+    const humanAuthorization = Array.isArray(messages)
+      && messages.some((message) => message?.source?.kind === 'user');
+    if (state.currentTurn !== turn || humanAuthorization) {
+      startTurn(agent, state, turn, step, humanAuthorization);
+    }
     state.currentStep = step;
 
     let reason;
     if (state.mode === 'stopped' || state.mode === 'paused') {
       reason = state.stopReason;
-    } else if (Number.isInteger(step) && step > config.maxTurnSteps) {
+    } else if (state.logicalSteps > config.maxTurnSteps) {
       reason = 'CONTEXT-GUARD STOPPED: turn ' + turn
         + ' exceeded the hard limit of ' + config.maxTurnSteps + ' steps.';
     } else {
@@ -684,8 +882,8 @@ export function apply(ctx, rawConfig = {}) {
       state.diagnosticNoticeIssued = true;
       const record = state.timeoutRecord;
       injected.push(notice(
-        'EXECUTOR DIAGNOSTIC MODE: the previous executor call timed out and its '
-          + 'process cleanup completed before this state was entered. Tool='
+        'EXECUTOR DIAGNOSTIC MODE: the previous executor call reported a timeout. '
+          + 'Process cleanup status is not available from this guard. Tool='
           + record.tool
           + '; duration=' + (record.durationMs ?? 'unknown')
           + 'ms; diagnostic calls remaining='
@@ -736,5 +934,19 @@ export function apply(ctx, rawConfig = {}) {
     if (!state || state.currentTurn !== turn) return;
     state.turnActive = false;
     clearTurnTimers(state);
+  });
+
+  ctx.on('agent/disposed', ({ agent }) => {
+    const state = states.get(agent);
+    if (!state) return;
+    clearTurnTimers(state);
+    states.delete(agent);
+  });
+
+  // Keep the session-owned execution state available for an agent reconnect;
+  // release it only when the durable session itself is disposed.
+  ctx.on('session/disposed', (session) => {
+    const sessionId = session?.id;
+    if (sessionId !== undefined) sessionStates.delete(String(sessionId));
   });
 }

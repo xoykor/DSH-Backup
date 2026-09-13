@@ -36,8 +36,7 @@ llm-pi-ai:
           maxTokens: 65536
         - id: qwen3.8-27b-gsq-rco
 agent-default-model:
-  provider: relay-codex
-  model: gpt-5.6-luna
-  reasoningEffort: max
+  provider: lmstudio
+  model: ornith-1.5-9b
 permission:
   defaultPreset: danger-full-access

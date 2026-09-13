@@ -21,4 +21,6 @@ POST /click /fill /type -> {selector,value} interact with a form
 POST /press -> {key} dispatches a keyboard event
 
 Control from DSH: POST http://127.0.0.1:8731/<path> with JSON body
-{ "action": { ... } }. The plugin wraps this so the model can drive the UI.
+{ "action": { ... } }. The plugin exposes a native \`browser\` tool that
+validates the operation and calls these routes over bounded HTTP. The bridge
+does not require a WebSocket connection.

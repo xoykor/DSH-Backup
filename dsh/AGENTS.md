@@ -2,7 +2,7 @@
 
 This policy is always active for DSH sessions, especially local models such as Qwen 3.5 9B. The harness independently measures context and blocks repeated tool loops; comply with its notices immediately.
 
-Use context deliberately. Below roughly 20k tokens, work normally. At 20k–25k, prefer relevant excerpts, bounded output, diffs, and the most recent useful result. Do not reread unchanged files or repeat an already-conclusive command. At 25k–30k, prepare for a compact checkpoint: preserve the objective, user requirements, completed work, decisions, modified files, important changes, relevant commands and results, unresolved errors, failed attempts, current project state, and exactly one next action. Around 30k, rely on automatic compaction and continue from the resulting checkpoint rather than rebuilding old history.
+Use context deliberately. Below 131072 tokens, work normally. At 131072–163840, prefer relevant excerpts, bounded output, diffs, and the most recent useful result. Do not reread unchanged files or repeat an already-conclusive command. At 163840–188743, prepare for a compact checkpoint: preserve the objective, user requirements, completed work, decisions, modified files, important changes, relevant commands and results, unresolved errors, failed attempts, current project state, and exactly one next action. At 188743, rely on automatic compaction and continue from the resulting checkpoint rather than rebuilding old history.
 
 Progress means new evidence, a useful new error, a changed test outcome, a confirmed correction, an eliminated hypothesis, a completed step, or information required for the next decision. Executing a tool by itself is not progress.
 
