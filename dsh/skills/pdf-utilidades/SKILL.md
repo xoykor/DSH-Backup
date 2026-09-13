@@ -1,6 +1,6 @@
 ---
 name: pdf-utilidades
-description: Inspecionar e transformar PDFs locais com extração de texto, separação, junção, reordenação e renderização verificáveis, mantendo o PDF de origem.
+description: Inspecionar e transformar PDFs locais, extrair texto e executar OCR de páginas escaneadas ou imagens, com resultados verificáveis e preservação dos originais.
 ---
 
 # Utilidades PDF
@@ -19,6 +19,12 @@ Exemplos:
 
 `python scripts/pdf_ops.py render --input reordenado.pdf --output-dir render`
 
-O JSON emitido inclui contagem de páginas, classificação textual e caminhos de saída. `inspect` e `extract` distinguem PDFs com texto extraível de PDFs provavelmente escaneados ou vazios. Isso é um diagnóstico, não OCR: OCR só deve ser proposto se um executável externo estiver instalado e autorizado. `render` usa Poppler `pdftoppm`, detectando `PDFTOPPM`, PATH ou o binário bundled conhecido.
+O JSON emitido inclui contagem de páginas, classificação textual e caminhos de saída. `inspect` e `extract` distinguem PDFs com texto extraível de PDFs provavelmente escaneados ou vazios. Para OCR, use o helper específico abaixo. `render` usa Poppler `pdftoppm`, detectando `PDFTOPPM`, PATH ou o binário bundled conhecido.
 
 Dependências: Python 3 com `pypdf`; `pdftoppm` do Poppler apenas para renderização. O script recusa substituir o arquivo de entrada, inclusive por hardlink, e os resultados devem ser reabertos e renderizados quando a aparência importar. `pypdf` não recalcula nem interpreta conteúdo gráfico.
+
+## OCR local
+
+Para documentos escaneados, execute `python3 scripts/ocr_local.py --input entrada.pdf --pages 1-3 --lang por --output-dir ocr-novo`. Para uma imagem, omita `--pages`. O helper usa Tesseract, sem depender de visão do 9B ou de `pypdf`; para PDF também precisa de `pdfinfo` e `pdftoppm`. O modelo de idioma português acompanha o pacote, com origem e licença em `assets/tessdata/`; outros idiomas podem vir do sistema ou de `--tessdata-dir`.
+
+Consulte [references/ocr.md](references/ocr.md) para idiomas, limites, saídas e códigos de retorno. TXT e TSV são gerados por página, com contagem de palavras e marcação de páginas vazias. Confira amostras contra o original: confiança do motor não equivale a exatidão, e OCR não preserva necessariamente tabelas ou diagramação. A saída fica em pasta nova; uma execução parcial nunca é declarada completa.

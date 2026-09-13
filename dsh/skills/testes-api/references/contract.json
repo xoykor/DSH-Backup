@@ -1,0 +1,81 @@
+{
+  "schema": {
+    "allow_mutations": "boolean (default false)",
+    "requests": [
+      {
+        "name": "string optional",
+        "url": "http(s) URI",
+        "method": "GET|HEAD|POST|PUT|PATCH|DELETE",
+        "headers": "object optional",
+        "body": "string|object optional",
+        "timeout": "number seconds optional",
+        "expect": {
+          "status": "number or {equals:number}; default 200 if expect omitted",
+          "headers": {
+            "header-name": "string or {equals:string, contains:string}"
+          },
+          "body": {
+            "equals": "string optional",
+            "contains": "string|string[] optional",
+            "fields": {
+              "json.path": "scalar or {equals:scalar, contains:scalar} optional"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "example": {
+    "requests": [
+      {
+        "name": "health",
+        "url": "http://127.0.0.1:8080/health",
+        "expect": {
+          "status": {
+            "equals": 200
+          },
+          "headers": {
+            "content-type": {
+              "contains": "application/json"
+            }
+          },
+          "body": {
+            "fields": {
+              "status": {
+                "equals": "ok"
+              },
+              "version": {
+                "contains": "1."
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "known-404",
+        "url": "http://127.0.0.1:8080/missing",
+        "expect": {
+          "status": {
+            "equals": 404
+          },
+          "body": {
+            "contains": "not found"
+          }
+        }
+      }
+    ]
+  },
+  "limits": {
+    "requests": 32,
+    "total_timeout_seconds": [
+      0.05,
+      600
+    ],
+    "body_max_bytes": [
+      1,
+      262144
+    ],
+    "redirects": "not followed",
+    "output": "must not exist"
+  }
+}

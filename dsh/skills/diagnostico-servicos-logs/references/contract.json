@@ -1,0 +1,46 @@
+{
+  "schema": {
+    "inputs": {
+      "container": "string[]",
+      "service": "string[]",
+      "url": "uri[]",
+      "log_file": "path[]",
+      "timeout_seconds": "number",
+      "max_log_bytes": "integer"
+    },
+    "output": {
+      "status": "ok|incomplete|error",
+      "targets": "array",
+      "facts": "array of {kind, source, value}",
+      "hypotheses": "array of {basis, text}",
+      "truncated": "boolean",
+      "duration_ms": "integer"
+    },
+    "target": {
+      "kind": "container|service|url|log_file",
+      "name": "string",
+      "observations": "array",
+      "exit_codes": "object",
+      "log_signatures": "array of {signature, count, first_line, last_line, sample}"
+    }
+  },
+  "example": {
+    "status": "incomplete",
+    "truncated": true,
+    "facts": [
+      {"kind": "executable", "source": "docker", "value": "unavailable"}
+    ],
+    "hypotheses": [],
+    "targets": [
+      {
+        "kind": "log_file",
+        "name": "/tmp/app.log",
+        "observations": [{"status": "ok", "lines": 2}],
+        "exit_codes": {},
+        "log_signatures": [
+          {"signature": "timeout contacting upstream", "count": 2, "first_line": 1, "last_line": 2, "sample": "timeout contacting upstream"}
+        ]
+      }
+    ]
+  }
+}
