@@ -5,7 +5,7 @@
  * that stop a turn are made by the executor, not by a model instruction.
  */
 export const name = 'dsh-context-guard';
-export const inject = ['tools', 'tokenMeter'];
+export const inject = ['tools', 'tokenMeter', 'compaction'];
 
 const DEFAULTS = Object.freeze({
   economyTokens: 131_072,
@@ -16,7 +16,7 @@ const DEFAULTS = Object.freeze({
   maxTurnSteps: 48,
   maxTurnToolCalls: 48,
   maxTurnMs: 900_000,
-  maxTurnTokens: 240_000,
+  maxTurnTokens: undefined,
   diagnosticMaxCalls: 3,
   diagnosticMaxMs: 120_000,
   diagnosticMaxTokens: 24_000,
@@ -56,7 +56,9 @@ function resolveConfig(raw = {}) {
     maxTurnSteps: positiveInteger(raw.maxTurnSteps, DEFAULTS.maxTurnSteps, 'maxTurnSteps'),
     maxTurnToolCalls: positiveInteger(raw.maxTurnToolCalls, DEFAULTS.maxTurnToolCalls, 'maxTurnToolCalls'),
     maxTurnMs: positiveInteger(raw.maxTurnMs, DEFAULTS.maxTurnMs, 'maxTurnMs'),
-    maxTurnTokens: positiveInteger(raw.maxTurnTokens, DEFAULTS.maxTurnTokens, 'maxTurnTokens'),
+    maxTurnTokens: raw.maxTurnTokens !== undefined
+      ? positiveInteger(raw.maxTurnTokens, undefined, 'maxTurnTokens')
+      : undefined,
     diagnosticMaxCalls: positiveInteger(raw.diagnosticMaxCalls, DEFAULTS.diagnosticMaxCalls, 'diagnosticMaxCalls'),
     diagnosticMaxMs: positiveInteger(raw.diagnosticMaxMs, DEFAULTS.diagnosticMaxMs, 'diagnosticMaxMs'),
     diagnosticMaxTokens: positiveInteger(raw.diagnosticMaxTokens, DEFAULTS.diagnosticMaxTokens, 'diagnosticMaxTokens'),
@@ -393,6 +395,9 @@ function createState() {
     economyNoticed: false,
     checkpointNoticed: false,
     compactNoticed: false,
+    immediateCompactionPending: false,
+    immediateCompactionPromise: undefined,
+    agent: undefined,
   };
 }
 
@@ -407,6 +412,7 @@ export function apply(ctx, rawConfig = {}) {
       const sessionId = agent?.session?.id === undefined ? undefined : String(agent.session.id);
       state = sessionId === undefined ? undefined : sessionStates.get(sessionId);
       if (!state) state = createState();
+      state.agent = agent;
       states.set(agent, state);
       if (sessionId !== undefined) sessionStates.set(sessionId, state);
     }
@@ -450,6 +456,48 @@ export function apply(ctx, rawConfig = {}) {
     return state.turnTokenUsage;
   };
 
+  const resetTurnState = (state, agent) => {
+    state.turnStartedAt = Date.now();
+    state.turnCalls = 0;
+    state.inFlightCalls = 0;
+    state.turnTokenBaseline = readTokenTotal(agent) ?? null;
+    state.turnTokenUsage = 0;
+    state.reportedTokenUsage = 0;
+    state.hasReportedTokenUsage = false;
+    state.meterHighWater = 0;
+    state.diagnosticCalls = 0;
+    state.diagnosticStartedAt = 0;
+    state.diagnosticTokenBaseline = 0;
+    state.diagnosticNoticeIssued = false;
+    state.turnActive = true;
+  };
+
+  const resetLogicalExecutionState = (state) => {
+    state.logicalStartedAt = Date.now();
+    state.logicalSteps = 0;
+    state.changeVersion = 0;
+    state.mode = 'normal';
+    state.stopReason = '';
+    state.cancelFailed = false;
+    state.timeoutRecord = null;
+    state.immediateCompactionPending = false;
+    state.immediateCompactionPromise = undefined;
+    state.noProgress = 0;
+    state.lastAssistantText = '';
+    state.repeatedAssistantText = false;
+    state.actionCounts.clear();
+    state.stagnantActionCounts.clear();
+    state.actionSamples.length = 0;
+    state.failureFamilyCounts.clear();
+    state.failureFamilyVersion.clear();
+    state.lastFailureFamily = '';
+    state.lastResultByAction.clear();
+    state.actionHistory.length = 0;
+    state.economyNoticed = false;
+    state.checkpointNoticed = false;
+    state.compactNoticed = false;
+  };
+
   const stopTurn = (agent, state, reason, mode = 'stopped') => {
     if (state.mode === 'stopped' || state.mode === 'paused') return;
     state.mode = mode;
@@ -475,48 +523,90 @@ export function apply(ctx, rawConfig = {}) {
     }
   };
 
-  const startTurn = (agent, state, turn, step, humanAuthorization = false) => {
-    const newLogicalExecution = state.currentTurn === null || humanAuthorization;
+  const runImmediateCompaction = (agent, state) => {
+    if (!state.immediateCompactionPending || state.immediateCompactionPromise) return;
+    if (!ctx.compaction || typeof ctx.compaction.compactNow !== 'function') {
+      state.immediateCompactionPending = false;
+      stopTurn(
+        agent,
+        state,
+        'CONTEXT-GUARD STOPPED: immediate compaction reached the threshold, but no compaction service is available.',
+      );
+      return;
+    }
+
+    const promise = (async () => {
+      try {
+        const result = await ctx.compaction.compactNow(agent, new AbortController().signal);
+        if (result === null) throw new Error('no compactable durable history was available');
+        state.immediateCompactionPending = false;
+        resetLogicalExecutionState(state);
+        resetTurnState(state, agent);
+        agent.steer(notice(
+          'CONTEXT-GUARD: context pressure interrupted the previous step and was compacted immediately. '
+            + 'Resume the current task from the compacted durable history. Do not repeat an interrupted '
+            + 'side-effecting operation without checking whether it completed.',
+          'resumed after immediate context compaction',
+        ));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        state.immediateCompactionPending = false;
+        stopTurn(
+          agent,
+          state,
+          'CONTEXT-GUARD STOPPED: immediate compaction failed after the context threshold was reached: '
+            + message,
+        );
+      } finally {
+        state.immediateCompactionPromise = undefined;
+      }
+    })();
+    state.immediateCompactionPromise = promise;
+    void promise;
+  };
+
+  const beginImmediateCompaction = (agent, state, totalTokens) => {
+    if (state.mode !== 'normal' || !state.turnActive || state.immediateCompactionPending) return;
+    const reason = 'CONTEXT-GUARD: approximately ' + totalTokens
+      + ' tokens reached the compaction threshold; interrupting the active step for immediate compaction.';
+    state.immediateCompactionPending = true;
+    state.mode = 'compacting';
+    state.stopReason = reason;
+    state.turnActive = false;
+    clearTurnTimers(state);
+    try {
+      if (typeof agent?.cancel !== 'function') throw new Error('agent cancellation is unavailable');
+      agent.cancel({ kind: 'context-guard-compaction', reason }, { keepInbox: true });
+    } catch (error) {
+      state.immediateCompactionPending = false;
+      const message = error instanceof Error ? error.message : String(error);
+      stopTurn(
+        agent,
+        state,
+        reason + ' Active work could not be interrupted: ' + message,
+      );
+      return;
+    }
+    if (agent.status === 'idle') runImmediateCompaction(agent, state);
+  };
+
+  const startTurn = (agent, state, turn, step, authorization = false) => {
+    const isNewTurn = state.currentTurn !== turn;
+    const newLogicalExecution = state.currentTurn === null || authorization;
     clearTurnTimers(state);
     if (newLogicalExecution) {
-      state.logicalStartedAt = Date.now();
-      state.logicalSteps = 0;
-      state.turnCalls = 0;
-      state.inFlightCalls = 0;
-      state.turnTokenBaseline = readTokenTotal(agent) ?? null;
-      state.turnTokenUsage = 0;
-      state.reportedTokenUsage = 0;
-      state.hasReportedTokenUsage = false;
-      state.meterHighWater = 0;
-      state.changeVersion = 0;
-      state.mode = 'normal';
-      state.stopReason = '';
-      state.cancelFailed = false;
-      state.timeoutRecord = null;
-      state.diagnosticCalls = 0;
-      state.diagnosticStartedAt = 0;
-      state.diagnosticTokenBaseline = 0;
-      state.diagnosticNoticeIssued = false;
-      state.noProgress = 0;
-      state.lastAssistantText = '';
-      state.repeatedAssistantText = false;
-      state.actionCounts.clear();
-      state.stagnantActionCounts.clear();
-      state.actionSamples.length = 0;
-      state.failureFamilyCounts.clear();
-      state.failureFamilyVersion.clear();
-      state.lastFailureFamily = '';
-      state.lastResultByAction.clear();
-      state.actionHistory.length = 0;
-      state.economyNoticed = false;
-      state.checkpointNoticed = false;
-      state.compactNoticed = false;
+      resetLogicalExecutionState(state);
+      resetTurnState(state, agent);
+    } else if (isNewTurn) {
+      resetTurnState(state, agent);
+      if (state.mode === 'idle') {
+        state.mode = 'normal';
+      }
     } else if (state.mode === 'idle') {
       state.mode = 'normal';
     }
     state.currentTurn = turn;
     state.currentStep = step;
-    state.turnStartedAt = state.logicalStartedAt;
     state.turnActive = true;
     state.logicalSteps += 1;
 
@@ -598,7 +688,7 @@ export function apply(ctx, rawConfig = {}) {
         + config.maxTurnToolCalls + '; results and the next step must be reported without another automatic call.';
     }
     const tokenUsage = updateTokenUsage(state, agent);
-    if (tokenUsage !== undefined && tokenUsage >= config.maxTurnTokens) {
+    if (config.maxTurnTokens !== undefined && tokenUsage !== undefined && tokenUsage >= config.maxTurnTokens) {
       return 'CONTEXT-GUARD STOPPED: the turn exhausted its global token budget of '
         + config.maxTurnTokens + ' tokens.';
     }
@@ -631,6 +721,9 @@ export function apply(ctx, rawConfig = {}) {
     if (state.mode === 'stopped' || state.mode === 'paused') {
       return 'CONTEXT-GUARD BLOCKED: this turn is already closed by the executor. '
         + state.stopReason;
+    }
+    if (state.mode === 'compacting') {
+      return 'CONTEXT-GUARD BLOCKED: immediate context compaction is in progress; the interrupted turn will resume after it commits.';
     }
 
     const beforeCall = budgetReason(exec.agent, state);
@@ -794,7 +887,7 @@ export function apply(ctx, rawConfig = {}) {
         'CONTEXT-GUARD STOPPED: the turn exhausted its global tool-call budget of '
           + config.maxTurnToolCalls + '.',
       );
-    } else if (tokenUsage !== undefined && tokenUsage >= config.maxTurnTokens) {
+    } else if (config.maxTurnTokens !== undefined && tokenUsage !== undefined && tokenUsage >= config.maxTurnTokens) {
       stopTurn(
         exec.agent,
         state,
@@ -816,10 +909,9 @@ export function apply(ctx, rawConfig = {}) {
   });
 
   ctx.on('session/event', (session, event) => {
-    if (event.type !== 'assistant/message') return;
     const state = sessionStates.get(String(session.id));
     if (!state) return;
-    if (event.data?.turn === state.currentTurn) {
+    if (event.type === 'assistant/message' && event.data?.turn === state.currentTurn) {
       const amount = tokenUsageAmount(event.data?.usage);
       if (amount !== undefined) {
         // Provider usage is per request. Summing it is stable across context
@@ -832,6 +924,17 @@ export function apply(ctx, rawConfig = {}) {
       }
     }
     if (state.mode === 'stopped' || state.mode === 'paused') return;
+    if (
+      state.mode === 'normal'
+      && state.turnActive
+      && (event.type === 'assistant/message' || event.type === 'tool/result')
+    ) {
+      const totalTokens = readTokenTotal(state.agent ?? undefined);
+      if (totalTokens !== undefined && totalTokens >= config.compactTokens) {
+        beginImmediateCompaction(state.agent, state, totalTokens);
+      }
+    }
+    if (event.type !== 'assistant/message') return;
     const text = (event.data?.message?.content ?? [])
       .filter((block) => block?.type === 'text')
       .map((block) => block.text)
@@ -845,13 +948,24 @@ export function apply(ctx, rawConfig = {}) {
     state.lastAssistantText = normalized;
   });
 
+  ctx.on('agent/status', ({ agent, status }) => {
+    if (status !== 'idle' || !agent) return;
+    const state = stateFor(agent);
+    state.agent = agent;
+    if (state.mode === 'compacting' && state.immediateCompactionPending) {
+      runImmediateCompaction(agent, state);
+    }
+  });
+
   ctx.on('agent/pre-step', async ({ agent, signal, turn, step, messages }, next) => {
     if (!agent) return next();
     const state = stateFor(agent);
     const humanAuthorization = Array.isArray(messages)
       && messages.some((message) => message?.source?.kind === 'user');
-    if (state.currentTurn !== turn || humanAuthorization) {
-      startTurn(agent, state, turn, step, humanAuthorization);
+    const isCompactionResume = Array.isArray(messages)
+      && messages.some((message) => message?.source?.kind === 'plugin' && message?.source?.plugin === name);
+    if (state.currentTurn !== turn || humanAuthorization || isCompactionResume) {
+      startTurn(agent, state, turn, step, humanAuthorization || isCompactionResume);
     }
     state.currentStep = step;
 

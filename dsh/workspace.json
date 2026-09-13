@@ -6,6 +6,7 @@
   "global": {
     "initialized": true,
     "workspaceIds": [
+      "6679cc7c-4356-47ae-be2b-b89d7628487f",
       "6ed4fda5-23eb-4187-933d-e76db3351fe8",
       "f3c282aa-e1b3-4290-a3bc-7621c3f8cbdb",
       "954a679f-e387-4ec5-be9a-0578b95412ba"
@@ -19,21 +20,28 @@
         "title": "Projetinho",
         "sessionIds": [],
         "createdAt": "2026-09-11T21:06:35.350Z",
-        "updatedAt": "2026-09-13T08:25:19.426Z"
+        "updatedAt": "2026-09-13T20:18:31.671Z"
       },
       "f3c282aa-e1b3-4290-a3bc-7621c3f8cbdb": {
         "path": "__HOME__/Documentos/DSH",
         "title": "DSH",
         "sessionIds": [],
         "createdAt": "2026-09-12T15:10:52.537Z",
-        "updatedAt": "2026-09-13T07:41:15.116Z"
+        "updatedAt": "2026-09-13T21:05:06.366Z"
       },
       "6ed4fda5-23eb-4187-933d-e76db3351fe8": {
         "path": "__HOME__/Documentos/Cachy",
         "title": "Cachy",
         "sessionIds": [],
         "createdAt": "2026-09-12T16:29:14.413Z",
-        "updatedAt": "2026-09-12T16:29:14.494Z"
+        "updatedAt": "2026-09-13T15:09:41.200Z"
+      },
+      "6679cc7c-4356-47ae-be2b-b89d7628487f": {
+        "path": "__HOME__/Documentos/Estudo/Avaliação Docente",
+        "title": "Avaliação Docente",
+        "sessionIds": [],
+        "createdAt": "2026-09-13T19:47:55.194Z",
+        "updatedAt": "2026-09-13T19:47:55.313Z"
       }
     }
   }

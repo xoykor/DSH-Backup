@@ -58,8 +58,8 @@ def binary(name):
     found = shutil.which(name)
     if found:
         return found
-    for root in [Path('/home/x/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override'),
-                 Path('/home/x/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback')]:
+    for root in [Path('__HOME__/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override'),
+                 Path('__HOME__/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback')]:
         if (root / name).is_file():
             return str(root / name)
     raise OCRError(f"missing dependency: {name}")

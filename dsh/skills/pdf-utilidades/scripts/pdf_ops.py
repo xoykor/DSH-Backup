@@ -160,7 +160,7 @@ def find_pdftoppm() -> str:
     found = shutil.which("pdftoppm")
     if found:
         return found
-    bundled = Path("/home/x/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/pdftoppm")
+    bundled = Path("__HOME__/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/pdftoppm")
     if bundled.is_file():
         return str(bundled)
     raise PdfError("pdftoppm is required for render; install Poppler or set PDFTOPPM")

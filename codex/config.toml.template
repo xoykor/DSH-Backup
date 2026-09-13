@@ -139,6 +139,15 @@ trust_level = "trusted"
 [projects."__HOME__/Documents/Codex/2026-09-13/un"]
 trust_level = "trusted"
 
+[projects."__HOME__/Documents/Codex/2026-09-13/a"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-13/25k-tokens-em-palavras"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documentos/Estudo/Avaliação Docente"]
+trust_level = "trusted"
+
 [desktop]
 followUpQueueMode = "steer"
 conversationDetailMode = "STEPS_COMMANDS"
