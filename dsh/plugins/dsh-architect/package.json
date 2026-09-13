@@ -1,0 +1,9 @@
+{
+  "name": "dsh-architect",
+  "version": "1.0.0",
+  "description": "Bounded Gemini architect consultations for an Ornith coding agent.",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "files": ["lib/index.js"]
+}
