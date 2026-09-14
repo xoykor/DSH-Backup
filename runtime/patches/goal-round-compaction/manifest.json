@@ -1,0 +1,8 @@
+{
+  "package": "@deepseek-ai/dsh-goal-round-driver",
+  "version": "0.1.5-rc.2",
+  "relativeTarget": "lib/index.js",
+  "baseSha256": "c1b44d3e73acb45b9160493a122cfa46c0d57c01066407f9eb1daeb940588f92",
+  "patchedSha256": "9c1c1b6dbf1cc3ad55ba1f6c0773a3ea53c6fb0cca366873cf106afbf345737b",
+  "capability": "dsh.goalRound.compactionResume.v1"
+}

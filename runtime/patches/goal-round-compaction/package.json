@@ -1,0 +1,6 @@
+{
+  "name": "dsh-goal-round-compaction-patch",
+  "private": true,
+  "type": "module",
+  "description": "Persistent runtime patch that retries goal rounds paused by context compaction."
+}
