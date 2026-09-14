@@ -42,13 +42,13 @@ llm-pi-ai:
           maxTokens: 12000
           input: [text, image]
           reasoningEfforts:
-            off: "off"
-            minimal: "on"
-            low: "on"
-            medium: "on"
-            high: "on"
-            xhigh: "on"
-            max: "on"
+            off: "none"
+            minimal: "minimal"
+            low: "low"
+            medium: "medium"
+            high: "high"
+            xhigh: "xhigh"
+            max: "xhigh"
 agent-default-model:
   provider: lmstudio
   model: ornith-1.5-9b
