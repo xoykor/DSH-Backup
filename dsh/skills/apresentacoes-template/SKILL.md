@@ -7,7 +7,7 @@ description: Preencher uma apresentação PPTX existente com conteúdo estrutura
 
 Use um `.pptx` fornecido pelo usuário, mapeando campos `{{campo}}` para valores explícitos. Preserve mestre, tema, ordem e elementos que não forem alvo.
 
-1. Confirme os campos e prepare um JSON. Para texto de slide, use `scripts/fill_pptx.py --template TEMPLATE --values DATA.json --output RESULT.pptx`.
+1. Confirme os campos e prepare um JSON. Para texto de slide, use `scripts/fill_pptx --template TEMPLATE --values DATA.json --output RESULT.pptx`. O filler Rust preserva os membros do pacote e valida XML antes de publicar.
 2. Rode `scripts/validate_pptx --input RESULT.pptx --render-dir render/`. O helper Rust valida o ZIP/XML, procura marcadores restantes e, quando `soffice` existe, converte a apresentação em PDF para inspeção visual.
 3. Relate qualquer limitação de renderização ou de campos divididos entre runs. Se a tarefa exigir tabelas, gráficos, animações ou ajuste de layout, use `python-pptx`/PptxGenJS somente se instalados e faça uma verificação adicional.
 

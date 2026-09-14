@@ -19,7 +19,8 @@ use std::sync::{
     Arc,
 };
 use std::time::{Duration, Instant};
-use zip::ZipArchive;
+use zip::write::SimpleFileOptions;
+use zip::{ZipArchive, ZipWriter};
 
 type ToolResult = Result<Value, String>;
 
@@ -43,6 +44,8 @@ fn main() {
         "table_reconcile" => table_reconcile(&args[1..]),
         "validate_pptx" => validate_package(&args[1..], "ppt/", "a:t"),
         "validate_docx" => validate_package(&args[1..], "word/", "w:t"),
+        "fill_pptx" => fill_package(&args[1..], "ppt/", "a:t"),
+        "fill_docx" => fill_package(&args[1..], "word/", "w:t"),
         "sqlite_read" => sqlite_read(&args[1..]),
         _ => Err(format!("unknown Rust helper: {name}")),
     };
@@ -60,6 +63,12 @@ fn main() {
             {
                 eprintln!("{rendered}");
                 std::process::exit(1);
+            }
+            if matches!(name.as_str(), "fill_pptx" | "fill_docx")
+                && value.get("status").and_then(Value::as_str) == Some("error")
+            {
+                eprintln!("{rendered}");
+                std::process::exit(2);
             }
             println!("{rendered}");
         }
@@ -1215,6 +1224,194 @@ fn validate_package(args: &[String], prefix: &str, text_tag: &str) -> ToolResult
         }
     }
     Ok(result)
+}
+
+fn python_value_string(value: &Value) -> String {
+    match value {
+        Value::Null => "None".into(),
+        Value::Bool(true) => "True".into(),
+        Value::Bool(false) => "False".into(),
+        Value::String(value) => value.clone(),
+        Value::Number(value) => value.to_string(),
+        Value::Array(_) | Value::Object(_) => value.to_string(),
+    }
+}
+
+fn xml_escape_text(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+fn zip_options(member: &zip::read::ZipFile<'_>) -> SimpleFileOptions {
+    let mut options = SimpleFileOptions::default().compression_method(member.compression());
+    if let Some(mode) = member.unix_mode() {
+        options = options.unix_permissions(mode);
+    }
+    options
+}
+
+fn fill_package(args: &[String], prefix: &str, text_tag: &str) -> ToolResult {
+    let template = PathBuf::from(option(args, "--template", true)?.unwrap());
+    let values_path = PathBuf::from(option(args, "--values", true)?.unwrap());
+    let output = PathBuf::from(option(args, "--output", true)?.unwrap());
+    let allow_unresolved = args.iter().any(|arg| arg == "--allow-unresolved");
+    if !template.is_file() {
+        return Ok(json!({"status":"error", "error":"template_not_found"}));
+    }
+    let same_inode = output.exists()
+        && fs::metadata(&template)
+            .ok()
+            .zip(fs::metadata(&output).ok())
+            .map(|(left, right)| {
+                use std::os::unix::fs::MetadataExt;
+                left.dev() == right.dev() && left.ino() == right.ino()
+            })
+            .unwrap_or(false);
+    if template.canonicalize().ok() == output.canonicalize().ok() || same_inode {
+        return Ok(
+            json!({"status":"error", "error":"output must be a different file from template"}),
+        );
+    }
+    let values = read_json(&values_path)?;
+    let values = values
+        .get("values")
+        .and_then(Value::as_object)
+        .cloned()
+        .or_else(|| values.as_object().cloned())
+        .ok_or("values JSON must be an object")?;
+    for (key, value) in &values {
+        let text = python_value_string(value);
+        if text.chars().any(
+            |character| matches!(character as u32, 0x00..=0x08 | 0x0b..=0x0c | 0x0e..=0x1f | 0x7f),
+        ) {
+            return Ok(
+                json!({"status":"error", "error":format!("value for {key:?} contains an XML-invalid control character")}),
+            );
+        }
+    }
+    let source_file = File::open(&template).map_err(|e| e.to_string())?;
+    let mut source = ZipArchive::new(source_file).map_err(|e| e.to_string())?;
+    let marker_pattern =
+        Regex::new(r"\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}").map_err(|e| e.to_string())?;
+    let text_pattern = Regex::new(&format!(
+        r"(?s)<{}\b([^>]*)>(.*?)</{}>",
+        regex::escape(text_tag),
+        regex::escape(text_tag)
+    ))
+    .map_err(|e| e.to_string())?;
+    let mut members = Vec::<(String, Vec<u8>, SimpleFileOptions, bool)>::new();
+    let mut changed = Map::new();
+    let mut missing = BTreeSet::new();
+    let mut text_bodies = String::new();
+    for index in 0..source.len() {
+        let mut member = source.by_index(index).map_err(|e| e.to_string())?;
+        let name = member.name().to_string();
+        let directory = member.is_dir();
+        let options = zip_options(&member);
+        let mut content = Vec::new();
+        member
+            .read_to_end(&mut content)
+            .map_err(|e| e.to_string())?;
+        if name.starts_with(prefix) && name.ends_with(".xml") {
+            let raw = String::from_utf8(content).map_err(|e| e.to_string())?;
+            let mut reader = XmlReader::from_str(&raw);
+            loop {
+                match reader.read_event() {
+                    Ok(Event::Eof) => break,
+                    Ok(_) => {}
+                    Err(error) => return Err(error.to_string()),
+                }
+            }
+            let replaced = text_pattern
+                .replace_all(&raw, |capture: &regex::Captures<'_>| {
+                    let body = capture
+                        .get(2)
+                        .map(|value| value.as_str())
+                        .unwrap_or_default();
+                    let new_body = marker_pattern
+                        .replace_all(body, |marker: &regex::Captures<'_>| {
+                            let key = marker
+                                .get(1)
+                                .map(|value| value.as_str())
+                                .unwrap_or_default();
+                            let Some(value) = values.get(key) else {
+                                missing.insert(key.to_string());
+                                return marker.get(0).unwrap().as_str().to_string();
+                            };
+                            let count = changed.get(key).and_then(Value::as_u64).unwrap_or(0) + 1;
+                            changed.insert(key.to_string(), json!(count));
+                            xml_escape_text(&python_value_string(value))
+                        })
+                        .into_owned();
+                    format!(
+                        "<{}{}>{}</{}>",
+                        text_tag,
+                        capture
+                            .get(1)
+                            .map(|value| value.as_str())
+                            .unwrap_or_default(),
+                        new_body,
+                        text_tag
+                    )
+                })
+                .into_owned();
+            let mut check_reader = XmlReader::from_str(&replaced);
+            loop {
+                match check_reader.read_event() {
+                    Ok(Event::Eof) => break,
+                    Ok(_) => {}
+                    Err(error) => return Err(error.to_string()),
+                }
+            }
+            for capture in text_pattern.captures_iter(&replaced) {
+                text_bodies.push_str(
+                    capture
+                        .get(2)
+                        .map(|value| value.as_str())
+                        .unwrap_or_default(),
+                );
+            }
+            content = replaced.into_bytes();
+        }
+        members.push((name, content, options, directory));
+    }
+    let unresolved = marker_pattern
+        .captures_iter(&text_bodies)
+        .filter_map(|capture| capture.get(1).map(|value| value.as_str().to_string()))
+        .collect::<BTreeSet<_>>();
+    if (!missing.is_empty() || !unresolved.is_empty()) && !allow_unresolved {
+        return Ok(
+            json!({"status":"error", "error":"unresolved_markers", "missing_values":missing, "unresolved":unresolved}),
+        );
+    }
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let output_file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&output)
+        .map_err(|e| e.to_string())?;
+    let mut target = ZipWriter::new(output_file);
+    for (name, content, options, directory) in members {
+        if directory {
+            target
+                .add_directory(name, options)
+                .map_err(|e| e.to_string())?;
+        } else {
+            target
+                .start_file(name, options)
+                .map_err(|e| e.to_string())?;
+            target.write_all(&content).map_err(|e| e.to_string())?;
+        }
+    }
+    target.finish().map_err(|e| e.to_string())?;
+    Ok(
+        json!({"status":"ok", "output":output, "replaced":changed, "missing":missing, "unresolved":unresolved}),
+    )
 }
 
 const SQLITE_MAX_RESULT: usize = 1024 * 1024;
