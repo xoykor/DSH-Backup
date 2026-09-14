@@ -157,6 +157,46 @@ function hasReadOnlyCapability(exec) {
     || exec?.definition?.readOnly === true;
 }
 
+// Published only on the registered executor definition, never in model input.
+// Resolving through the registry honors scoped replacements and restrictions.
+const JOB_OBSERVATION = Symbol.for('dsh.executor.jobObservation.v1');
+const MIN_MANAGED_WAIT_MS = 1_000;
+const ACTIVE_JOB_STATES = new Set(['running', 'stopping']);
+const TERMINAL_JOB_STATES = new Set(['completed', 'failed', 'killed']);
+
+function jobObservation(ctx, exec) {
+  try {
+    const capability = ctx.tools.get?.(exec.name, exec.agent)?.[JOB_OBSERVATION];
+    if (capability?.readOnly !== true || typeof capability.observe !== 'function') return undefined;
+    const observed = capability.observe(exec);
+    if (observed?.kind === 'list') return observed;
+    if (observed?.kind !== 'output' || typeof observed.jobId !== 'string'
+      || !Number.isFinite(observed.waitMs) || observed.waitMs < 0
+      || (!ACTIVE_JOB_STATES.has(observed.status) && !TERMINAL_JOB_STATES.has(observed.status))) {
+      return undefined;
+    }
+    return observed;
+  } catch {
+    // Missing/foreign job IDs and invalid arguments never earn an exemption.
+    return undefined;
+  }
+}
+
+function observationArguments(exec, observation) {
+  // Changing a poll's timeout/description must not manufacture a new action.
+  return observation?.kind === 'output'
+    ? { job_id: observation.jobId }
+    : identityArguments(exec.arguments);
+}
+
+function observationFingerprint(result, observation, cap) {
+  if (observation?.kind !== 'output' || result?.isError || !result?.value?.job) {
+    return toolResultText(result, cap);
+  }
+  const { text, job } = result.value;
+  return toolResultText({ value: { text, job: { id: job.id, status: job.status, detail: job.detail } } }, cap);
+}
+
 function identityArguments(argumentsValue) {
   if (!argumentsValue || typeof argumentsValue !== 'object' || Array.isArray(argumentsValue)) {
     return argumentsValue;
@@ -367,6 +407,7 @@ function createState() {
     lastResultByAction: new Map(),
     actionSamples: [],
     actionHistory: [],
+    collectedJobs: new Set(),
     noProgress: 0,
     lastAssistantText: '',
     repeatedAssistantText: false,
@@ -407,6 +448,7 @@ export function apply(ctx, rawConfig = {}) {
   const config = resolveConfig(rawConfig);
   const states = new WeakMap();
   const sessionStates = new Map();
+  const jobCalls = new WeakMap();
 
   const stateFor = (agent) => {
     let state = states.get(agent);
@@ -495,6 +537,7 @@ export function apply(ctx, rawConfig = {}) {
     state.lastFailureFamily = '';
     state.lastResultByAction.clear();
     state.actionHistory.length = 0;
+    state.collectedJobs.clear();
     state.economyNoticed = false;
     state.checkpointNoticed = false;
     state.compactNoticed = false;
@@ -600,7 +643,8 @@ export function apply(ctx, rawConfig = {}) {
       resetLogicalExecutionState(state);
       resetTurnState(state, agent);
     } else if (isNewTurn) {
-      resetTurnState(state, agent);
+      // A plugin wakeup/automatic continuation is still the same authorized
+      // execution. In particular, it cannot refill the diagnostic allowance.
       if (state.mode === 'idle') {
         state.mode = 'normal';
       }
@@ -735,10 +779,13 @@ export function apply(ctx, rawConfig = {}) {
     }
     state.turnCalls += 1;
 
+    const observation = jobObservation(ctx, exec);
+
     if (state.mode === 'diagnostic') {
-      if (!hasReadOnlyCapability(exec)) {
+      if (!observation && !hasReadOnlyCapability(exec)) {
         return 'CONTEXT-GUARD BLOCKED: diagnostic mode requires an explicit '
-          + 'read-only executor capability; tool names and command text are not sufficient.';
+          + 'read-only executor capability; tool names and command text are not sufficient. '
+          + 'Use a supported job_output/job_list observer for managed work; editing a goal is not read-only.';
       }
       if (
         state.timeoutRecord
@@ -757,7 +804,19 @@ export function apply(ctx, rawConfig = {}) {
       }
     }
 
-    const args = canonical(identityArguments(exec.arguments));
+    const eligibleObservation = observation?.kind === 'output' && (
+      (ACTIVE_JOB_STATES.has(observation.status) && observation.waitMs >= MIN_MANAGED_WAIT_MS)
+      || (TERMINAL_JOB_STATES.has(observation.status) && !state.collectedJobs.has(observation.jobId))
+    );
+    if (observation) jobCalls.set(exec, { observation, eligibleObservation, startedAt: Date.now() });
+    if (eligibleObservation) {
+      // Only the anti-investigation checks are skipped. The global and
+      // diagnostic budgets above (and their cancellation timers) still apply.
+      state.inFlightCalls += 1;
+      return undefined;
+    }
+
+    const args = canonical(observationArguments(exec, observation));
     const key = String(exec.name) + '\u0000' + args;
     const stagnantAttempts = state.stagnantActionCounts.get(key) ?? 0;
     const near = state.actionSamples.some((sample) => (
@@ -809,57 +868,76 @@ export function apply(ctx, rawConfig = {}) {
     if (!denied) state.inFlightCalls = Math.max(0, state.inFlightCalls - 1);
     const downstream = await next();
     if (denied) return downstream;
-    const args = canonical(identityArguments(exec.arguments));
+    const observedCall = jobCalls.get(exec);
+    jobCalls.delete(exec);
+    const observation = observedCall?.observation;
+    const resultJob = result?.value?.job;
+    const validJobResult = observation?.kind === 'output' && !result?.isError
+      && resultJob?.id === observation.jobId && typeof result.value.text === 'string'
+      && (ACTIVE_JOB_STATES.has(resultJob.status) || TERMINAL_JOB_STATES.has(resultJob.status));
+    const executionTimedOut = timeoutEvidence(result, exec.name);
+    const neutralObservation = observedCall?.eligibleObservation && validJobResult && !executionTimedOut
+      && (TERMINAL_JOB_STATES.has(resultJob.status)
+        || Date.now() - observedCall.startedAt >= MIN_MANAGED_WAIT_MS);
+    if (validJobResult && TERMINAL_JOB_STATES.has(resultJob.status)) state.collectedJobs.add(resultJob.id);
+    const args = canonical(observationArguments(exec, observation));
     const key = String(exec.name) + '\u0000' + args;
-    const attempts = (state.actionCounts.get(key) ?? 0) + 1;
-    state.actionCounts.set(key, attempts);
-    state.actionSamples.push({ name: exec.name, args });
-    if (state.actionSamples.length > 32) state.actionSamples.shift();
+    const fingerprint = observationFingerprint(result, observation, config.resultFingerprintChars);
 
-    const fingerprint = toolResultText(result, config.resultFingerprintChars);
-    const previousFingerprint = state.lastResultByAction.get(key);
-    const isNewResult = previousFingerprint === undefined || previousFingerprint !== fingerprint;
-    state.lastResultByAction.set(key, fingerprint);
-    const family = errorFamily(exec.name, exec.arguments, result);
-    if (family !== undefined) {
-      const previousFamily = state.lastFailureFamily;
-      const familyCount = (state.failureFamilyCounts.get(family) ?? 0) + 1;
-      state.failureFamilyCounts.set(family, familyCount);
-      state.failureFamilyVersion.set(family, state.changeVersion);
-      state.lastFailureFamily = family;
-      // Changing the wording, line, or stack of an equivalent failure does
-      // not constitute progress. A different failure class starts a separate
-      // bounded investigation budget.
-      state.noProgress = previousFamily === family ? state.noProgress + 1 : 1;
-      state.stagnantActionCounts.set(key, (state.stagnantActionCounts.get(key) ?? 0) + 1);
-    } else if (isNewResult) {
-      state.noProgress = 0;
-      state.lastFailureFamily = '';
-      state.stagnantActionCounts.set(key, 0);
-    } else {
-      state.noProgress += 1;
-      state.stagnantActionCounts.set(key, (state.stagnantActionCounts.get(key) ?? 0) + 1);
+    // An executor-confirmed wait is neutral: it neither consumes investigation
+    // retries nor clears previous failures. Empty output is not lack of job
+    // progress; waitExpired is not an execution timeout. Terminal state is
+    // collected once, so repeated reads of a finished job remain bounded.
+    if (!neutralObservation) {
+      const attempts = (state.actionCounts.get(key) ?? 0) + 1;
+      state.actionCounts.set(key, attempts);
+      state.actionSamples.push({ name: exec.name, args });
+      if (state.actionSamples.length > 32) state.actionSamples.shift();
+
+      const previousFingerprint = state.lastResultByAction.get(key);
+      const isNewResult = previousFingerprint === undefined || previousFingerprint !== fingerprint;
+      state.lastResultByAction.set(key, fingerprint);
+      const family = errorFamily(exec.name, exec.arguments, result);
+      if (family !== undefined) {
+        const previousFamily = state.lastFailureFamily;
+        const familyCount = (state.failureFamilyCounts.get(family) ?? 0) + 1;
+        state.failureFamilyCounts.set(family, familyCount);
+        state.failureFamilyVersion.set(family, state.changeVersion);
+        state.lastFailureFamily = family;
+        // Changing the wording, line, or stack of an equivalent failure does
+        // not constitute progress. A different failure class starts a separate
+        // bounded investigation budget.
+        state.noProgress = previousFamily === family ? state.noProgress + 1 : 1;
+        state.stagnantActionCounts.set(key, (state.stagnantActionCounts.get(key) ?? 0) + 1);
+      } else if (isNewResult) {
+        state.noProgress = 0;
+        state.lastFailureFamily = '';
+        state.stagnantActionCounts.set(key, 0);
+      } else {
+        state.noProgress += 1;
+        state.stagnantActionCounts.set(key, (state.stagnantActionCounts.get(key) ?? 0) + 1);
+      }
+      if (
+        isWorkspaceMutationCall(exec.name, exec.arguments)
+        && observedMutationChange(result)
+      ) {
+        state.changeVersion += 1;
+        state.failureFamilyCounts.clear();
+        state.failureFamilyVersion.clear();
+        state.stagnantActionCounts.clear();
+        state.noProgress = 0;
+        state.lastFailureFamily = '';
+      }
+
+      state.actionHistory.push({
+        semanticKey: semanticActionKey(exec.name, observationArguments(exec, observation)),
+        resultFingerprint: fingerprint,
+        changeVersion: state.changeVersion,
+      });
+      if (state.actionHistory.length > 32) state.actionHistory.shift();
     }
-    if (
-      isWorkspaceMutationCall(exec.name, exec.arguments)
-      && observedMutationChange(result)
-    ) {
-      state.changeVersion += 1;
-      state.failureFamilyCounts.clear();
-      state.failureFamilyVersion.clear();
-      state.stagnantActionCounts.clear();
-      state.noProgress = 0;
-      state.lastFailureFamily = '';
-    }
 
-    state.actionHistory.push({
-      semanticKey: semanticActionKey(exec.name, exec.arguments),
-      resultFingerprint: fingerprint,
-      changeVersion: state.changeVersion,
-    });
-    if (state.actionHistory.length > 32) state.actionHistory.shift();
-
-    if (timeoutEvidence(result, exec.name)) {
+    if (executionTimedOut) {
       if (state.mode === 'diagnostic') {
         stopTurn(
           exec.agent,
@@ -871,7 +949,7 @@ export function apply(ctx, rawConfig = {}) {
       enterDiagnostic(exec.agent, state, exec, result, fingerprint);
     }
 
-    if (hasRepeatedCycle(state.actionHistory)) {
+    if (!neutralObservation && hasRepeatedCycle(state.actionHistory)) {
       stopTurn(
         exec.agent,
         state,
@@ -1005,7 +1083,9 @@ export function apply(ctx, rawConfig = {}) {
           + 'ms; diagnostic calls remaining='
           + Math.max(0, config.diagnosticMaxCalls - state.diagnosticCalls)
           + '. The prior output is recorded immediately before this notice. '
-          + 'Only bounded diagnosis is allowed; an identical rerun requires a '
+          + 'Use executor-marked job_output/job_list to observe managed background work. '
+          + 'A pending wait is not an execution timeout. Goal edits and arbitrary shell probes '
+          + 'are not read-only diagnosis. Only bounded diagnosis is allowed; an identical rerun requires a '
           + 'real executor-observed change.',
         'diagnostic mode after executor timeout',
       ));

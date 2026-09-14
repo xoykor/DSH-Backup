@@ -1,5 +1,12 @@
 # Context and loop safety policy
 
+For local investigation and data extraction, load the `tool-first` skill before
+choosing a strategy. Prefer an existing deterministic tool, then a short Bash
+pipeline, then a bounded Lua scratch tool, and use Python when a specialized
+library is the concrete reason. Do not generate a script for a tool that already
+solves the query. Keep outputs bounded and retain paths, counts, truncation and
+errors as evidence.
+
 This policy is always active for DSH sessions, especially local models such as Qwen 3.5 9B. The harness independently measures context and blocks repeated tool loops; comply with its notices immediately.
 
 Use context deliberately. Below 65536 tokens, work normally. At 65536–81920, prefer relevant excerpts, bounded output, diffs, and the most recent useful result. Do not reread unchanged files or repeat an already-conclusive command. At 81920–94371, prepare for a compact checkpoint: preserve the objective, user requirements, completed work, decisions, modified files, important changes, relevant commands and results, unresolved errors, failed attempts, current project state, and exactly one next action. At 94371, rely on automatic compaction and continue from the resulting checkpoint rather than rebuilding old history.
