@@ -10,6 +10,8 @@ Progress means new evidence, a useful new error, a changed test outcome, a confi
 
 Never keep retrying equivalent actions. After three actions without significant progress, stop the current strategy, state the repeated pattern and failed evidence concisely, then choose a materially different safe approach. After five equivalent attempts, treat the approach as blocked. If no rational alternative remains, stop and report the specific blocker rather than spending more context.
 
+Managed background work uses `job_output` with the recorded `job_id`, `wait: true`, and a bounded wait (normally 30000ms) when no independent work remains. An executor-recognized blocking wait for an active job is neutral, even with empty output: it does not count as repeated investigation or reset previous failures. A wait that expires with `running`/`stopping` is pending, not an execution timeout or success. Prefer completion notifications; do not duplicate the job or switch tools to evade a guard. Only executor-marked observers are allowed during timeout diagnosis; editing a goal is not read-only. Hard budgets still apply. After a hard stop, preserve the pending job and wait for a new authorized turn; a notification does not reset the guard. See the `acompanhamento` skill for collection and artifact verification.
+
 When compacting or reporting state, retain exact paths, commands, error messages, identifiers, constraints, decisions, failed approaches, and the next concrete action. Discard stale terminal output, duplicated reasoning, and superseded plans.
 
 ## PTC `run_code` source-safety policy

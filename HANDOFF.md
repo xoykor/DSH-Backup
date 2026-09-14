@@ -1,5 +1,27 @@
 # Handoff — Sessão DSH/Codex Backup + Skills
 
+## Atualização — observação de jobs (2026-09-14)
+
+O guard e o executor de jobs foram corrigidos em conjunto. Esperas nativas
+bloqueantes por jobs ativos agora são neutras para os contadores de investigação;
+`job_output` e `job_list` publicam capacidade de leitura na definição registrada.
+`waitExpired` indica espera expirada com job ainda ativo, sem ativar diagnóstico.
+Limites totais e diagnósticos permanecem monotônicos em continuações automáticas.
+
+As skills `acompanhamento` e `quebra-de-loop` e a política global foram alinhadas:
+trocar ferramenta não contorna bloqueios, mtime/tamanho não provam conclusão e
+editar objetivo continua sendo mutação. O bloqueio de `update_goal` na captura não
+se resolve com uma skill que declare capacidade; o acompanhamento usa os
+observadores nativos. Não foi retomado nem alterado o download citado na captura.
+
+Validação: 17 regressões do guard e 13 testes do executor, incluindo integração
+com ToolRuntime/LocalJobRegistry reais. Instalação em disco não reinicia processos
+DSH existentes. Ativação em um host já iniciado exige reinício após os jobs relevantes
+terminarem. Detalhes e comandos: `runtime/patches/job-observation/README.md`.
+
+As anotações abaixo registram a sessão anterior; orientações antigas de
+acompanhamento por troca de ferramenta foram substituídas pela correção acima.
+
 ## Contexto
 - Autoridade: **live** (`~/.dsh`, `~/.codex`) é fonte da verdade; backup espelha o live.
 - Remote: `origin` → https://github.com/xoykor/DSH-Backup (branch `master`).

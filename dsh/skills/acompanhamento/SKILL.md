@@ -1,47 +1,34 @@
 ---
 name: acompanhamento
-description: Check para acompanhar chamadas de ferramentas demoradas sem loops redundantes. Proba artefatos duraveis/estado de processo por classe de ferramenta diferente (mtime/tamanho, pgrep/ps) e prefere job_list/job_output em vez de tail de log — cada probe produz evidencia nova.
-disable-model-invocation: false
-user-invocable: false
+description: Acompanhe tarefas gerenciadas de longa duração com espera nativa e critérios reais de conclusão, sem duplicar jobs nem transformar indícios em sucesso.
 ---
 
-# Acompanhamento (Check)
+# Acompanhamento
 
-## Quando rodar
+Use o background gerenciado da ferramenta quando ele existir. Ao lançar uma tarefa,
+registre o `job_id` e reutilize-o; não lance uma segunda cópia para consultar o
+progresso.
 
-Depois de lanchar qualquer chamada longa ou background (download, snapshot, build,
-job nohup/&, etc.), antes de repetir a mesma consulta. O objetivo e obter evidencia
-nova do progresso/completude sem ler o mesmo log duas vezes.
+Quando não houver trabalho independente para fazer, aguarde pela ferramenta nativa:
+`job_output({"job_id":"ID_RECEBIDO", "wait":true, "timeout_ms":30000})`. Use intervalos nativos de 30–60 segundos
+e nunca `bash sleep`. A saída incremental pode ser vazia. Use notificações de
+conclusão quando disponíveis.
 
-## Regra central
+`pending`, `running`, `stopping` e `waitExpired` são estados intermediários. Eles não
+significam falha, conclusão ou timeout da execução. `job_list` serve apenas para
+localizar uma vez um `job_id` perdido; depois, continue usando o ID encontrado.
 
-Uma probe que usa a mesma classe de ferramenta que a chamada anterior nao conta como
-evidencia nova. Trocar `tail` por `head`, ou `ls -l` por `wc -c`, sobre o mesmo
-arquivo e leitura = loop redundante, proibido.
+O job encerrou quando seu status for `completed`, `failed` ou `killed`. Só relate
+sucesso com `completed`, `detail`/`exit` compatíveis quando disponíveis e artefato
+validado pelos critérios reais da tarefa. Preserve e relate qualquer falha. Mtime, tamanho estável e desaparecimento de PID são apenas indícios;
+isoladamente não provam sucesso.
 
-## Probar por classe de ferramenta (produz evidencia nova)
+Se o orçamento do guard acabar, encerre o turno declarando claramente que o job está
+pendente e preserve-o para um novo turno autorizado. Uma notificação não autoriza
+reset nem garante continuação depois de um limite duro; conclusão automática normal
+só ocorre enquanto o guard admite continuação e um wakeup foi configurado.
 
-1. **Download / escrita de arquivo** → leia o ARTEFATO DURAVEL, nao o log:
-   - `stat`/mtime/tamanho do target; compare com a leitura anterior para ver crescimento.
-   - Tamanho final + mtime estavel = completude (evidencia nova), nao `tail`.
-
-2. **Processo nohup/sem rastreamento** → identifique por assinatura, depois le o artefato:
-   - `pgrep`/`ps` pela string de comando para achar PID e estado (running/finished).
-   - Em seguida le UMA vez o artefato de saida que ele escreve.
-
-3. **Jobs gerenciados pelo harness** → prefira sempre as ferramentas nativas:
-   - `job_list` (ids/kinds/status) e `job_output` (stream final) — classe de ferramenta
-     diferente do bash, portanto nao redundante.
-
-## Transicao para conclusao
-
-- Artefato finalizado ou processo finished = evidencia suficiente → conclua.
-- Sem progresso mas sem falha = reporte estado duravel + proxima acao concreta; pare
-  de probear o mesmo target ate haver crescimento ou erro novo.
-- Se nenhuma classe acima puder resolver, declare o bloqueio e nao converta em mais
-  leituras estaticas equivalentes.
-
-## Integracao com quebra-de-loop
-
-Se o probe redundante for negado pelo guard de contexto, mude de classe de ferramenta
-(classe 1/2/3 acima) ou peca apenas dado faltante — nunca repita a consulta negada.
+O guard permite leitura explicitamente verificada de `job_output`/`job_list` e uma
+espera neutra legítima. Consultas rápidas repetidas continuam bloqueadas. Não edite
+goals durante diagnóstico, não crie skill e não troque de ferramenta ou classe para
+contornar o guard.

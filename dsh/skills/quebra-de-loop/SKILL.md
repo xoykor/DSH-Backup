@@ -1,8 +1,6 @@
 ---
 name: quebra-de-loop
 description: Check automatizado contra loops de investigacao redundante e guia para quebrar o loop. Antes de cada passo de investigacao, verifique se ha evidencia suficiente para a proxima acao autorizada; se nao, produza evidencia nova ou peca apenas os dados faltantes — nunca repita leituras equivalentes.
-disable-model-invocation: false
-user-invocable: false
 ---
 
 # Quebra de Loop (Check)
@@ -32,12 +30,21 @@ estatica que nao podem resolvê-la.
 
 ## Quebrar o loop (quando falta informacao)
 
-- Produza evidencia nova: artefato duravel (mtime/tamanho), `pgrep`/`ps` por
-  assinatura, ou ferramenta diferente da que foi negada.
+- Procure uma mudanca observavel relevante para a decisao. Trocar de ferramenta,
+  consultar mtime/tamanho ou procurar um PID nao cria evidencia por si so e nao
+  contorna um bloqueio do executor.
 - Se faltar dado indispensavel para agir corretamente, peça APENAS esse dado — o
   que nao pode ser obtido dentro das restricoes vigentes. Nao devolva ao usuario
   trabalho que se poderia executar sozinho.
 - Relate estado duravel + proxima acao concreta em vez de ler logs repetidamente.
+
+## Espera por job gerenciado
+
+Esperar com `job_output` e `wait:true` pelo mesmo `job_id` ainda ativo e uma
+observacao neutra quando reconhecida pelo executor. Nao e investigacao repetida,
+nem prova de progresso ou sucesso. Siga a skill `acompanhamento`: espera nativa
+limitada, notificacoes e coleta do resultado terminal. Leituras rapidas repetidas,
+logs estaticos e troca de ferramentas continuam sujeitos ao guard.
 
 ## Validacao (nao e rediagnostico)
 

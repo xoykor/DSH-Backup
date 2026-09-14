@@ -1,0 +1,8 @@
+{
+  "package": "@deepseek-ai/dsh-tool-jobs",
+  "version": "0.1.2-rc.1",
+  "relativeTarget": "lib/index.js",
+  "baseSha256": "3d08bf491a3f0a98108a2f6aa39e4a152dec48ce11f5a53b487c08badcc3d747",
+  "patchedSha256": "0d2f55c4a5f0a75e2ddcdacc7c672923b93e3891f55678355f8d9ce717c51177",
+  "capability": "dsh.executor.jobObservation.v1"
+}

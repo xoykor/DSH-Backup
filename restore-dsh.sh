@@ -334,6 +334,12 @@ ensure_pnpm() {
   export PATH="$(dirname -- "$PNPM_BIN"):$DSH_INSTALL_PREFIX/bin:$PATH"
 }
 
+runtime_job_observation_patch() {
+  local target
+  target="$(node --input-type=module -e 'import { createRequire } from "node:module"; import { realpathSync } from "node:fs"; process.stdout.write(createRequire(realpathSync(process.argv[1])).resolve("@deepseek-ai/dsh-tool-jobs"));' "$DSH_BIN")"
+  node "$REPO_DIR/runtime/patches/job-observation/apply-job-observation.mjs" --target "$target" "$@"
+}
+
 ensure_dsh_runtime() {
   local runtime_template="$REPO_DIR/runtime"
   local lockfile="$REPO_DIR/$RUNTIME_LOCKFILE"
@@ -375,6 +381,8 @@ ensure_dsh_runtime() {
   PNPM_BIN="$runtime_root/node_modules/.bin/pnpm"
   [[ -x "$DSH_BIN" ]] || die "DSH executable not found in locked runtime: $DSH_BIN"
   [[ -x "$PNPM_BIN" ]] || die "pnpm executable not found in locked runtime: $PNPM_BIN"
+
+  runtime_job_observation_patch
 
   mkdir -p "$DSH_INSTALL_PREFIX/bin"
   ln -sfn -- "$DSH_BIN" "$DSH_INSTALL_PREFIX/bin/dsh"
@@ -537,6 +545,7 @@ verify_current() {
   actual="$($DSH_BIN --version 2>/dev/null || true)"
   [[ "$actual" == "$DSH_VERSION" ]] \
     || die "expected DSH $DSH_VERSION, found ${actual:-unavailable}"
+  runtime_job_observation_patch --check
   verify_saved_paths
   log "verification complete"
 }
