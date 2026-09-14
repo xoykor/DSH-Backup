@@ -2,12 +2,11 @@ import json
 from pathlib import Path
 import sqlite3
 import subprocess
-import sys
 import tempfile
 import time
 import unittest
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts/sqlite_read.py"
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts/sqlite_read"
 
 
 class SQLiteReadTests(unittest.TestCase):
@@ -19,7 +18,7 @@ class SQLiteReadTests(unittest.TestCase):
             conn.executemany("INSERT INTO people VALUES (?,?,?)", [(1, "Fortaleza", b"abc"), (2, "Recife", b"def"), (3, "Fortaleza", b"ghi")])
 
     def call(self, sql=None, params=None, code=0, extra=None, **limits):
-        cmd = [sys.executable, str(SCRIPT), "--database", str(self.db)]
+        cmd = [str(SCRIPT), "--database", str(self.db)]
         if sql is not None:
             spec = self.root / "query.json"
             spec.write_text(json.dumps({"sql": sql, "params": [] if params is None else params, **limits}))

@@ -5,12 +5,12 @@ description: Inspecionar schema e consultar bancos SQLite locais somente leitura
 
 # SQLite local
 
-Use Python 3.11+ e `scripts/sqlite_read.py`. O helper abre `mode=ro`, desabilita extensões e schema confiável, bloqueia escrita, ATTACH e PRAGMAs fora da introspecção. Nunca copie somente o arquivo principal de um banco ativo como se fosse um snapshot completo: o WAL pode conter dados confirmados.
+Use `scripts/sqlite_read`, um helper Rust distribuído pelo skill `tool-first`. O helper abre `mode=ro`, desabilita extensões e schema confiável, bloqueia escrita, ATTACH e PRAGMAs fora da introspecção. Nunca copie somente o arquivo principal de um banco ativo como se fosse um snapshot completo: o WAL pode conter dados confirmados.
 
 Inspecione primeiro:
 
 ```bash
-python3 scripts/sqlite_read.py --database app.db --mode schema
+scripts/sqlite_read --database app.db --mode schema
 ```
 
 Para consultar, escreva um JSON com SQL e parâmetros separados; não interpole valores recebidos do usuário no SQL:
@@ -20,7 +20,7 @@ Para consultar, escreva um JSON com SQL e parâmetros separados; não interpole 
 ```
 
 ```bash
-python3 scripts/sqlite_read.py --database app.db --mode query --spec consulta.json --output clientes.json
+scripts/sqlite_read --database app.db --mode query --spec consulta.json --output clientes.json
 ```
 
 `params` aceita objeto para parâmetros nomeados ou lista para `?`. `--output` cria um arquivo novo; `.csv` seleciona CSV, ou informe `--output-format json|csv`. Sem saída, o JSON contém `columns` e `rows` como arrays (nomes duplicados não perdem dados). Com saída, stdout traz apenas o resumo. BLOBs viram objetos com base64. CSV representa null como célula vazia e BLOB como JSON textual; prefira JSON quando precisar distinguir tipos.

@@ -1,11 +1,10 @@
 import json
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT=Path(__file__).resolve().parents[1]/'scripts/table_reconcile.py'
+SCRIPT=Path(__file__).resolve().parents[1]/'scripts/table_reconcile'
 
 class ReconcileTest(unittest.TestCase):
     def run_case(self,left,right,spec):
@@ -14,7 +13,7 @@ class ReconcileTest(unittest.TestCase):
             a=root/'left.json'; b=root/'right.json'; s=root/'spec.json'; out=root/'out.json'
             a.write_text(json.dumps(left)); b.write_text(json.dumps(right)); s.write_text(json.dumps(spec))
             before=(a.read_bytes(),b.read_bytes())
-            proc=subprocess.run([sys.executable,str(SCRIPT),'--left',str(a),'--right',str(b),'--spec',str(s),'--output',str(out)],capture_output=True,text=True,timeout=5)
+            proc=subprocess.run([str(SCRIPT),'--left',str(a),'--right',str(b),'--spec',str(s),'--output',str(out)],capture_output=True,text=True,timeout=5)
             self.assertEqual(before,(a.read_bytes(),b.read_bytes()))
             return proc,json.loads(out.read_text()) if out.exists() else None
 
@@ -47,7 +46,7 @@ class ReconcileTest(unittest.TestCase):
             root=Path(directory); a=root/'a.csv'; b=root/'b.csv'; s=root/'spec.json'; out=root/'out.json'
             a.write_text('id,value\n001,café\n002,old\n003,old\n'); b.write_text('id,value\n001,café\n002,new\n003,new\n')
             s.write_text('{"keys":["id"],"max_examples":1}')
-            proc=subprocess.run([sys.executable,str(SCRIPT),'--left',str(a),'--right',str(b),'--spec',str(s),'--output',str(out)],capture_output=True,text=True)
+            proc=subprocess.run([str(SCRIPT),'--left',str(a),'--right',str(b),'--spec',str(s),'--output',str(out)],capture_output=True,text=True)
             self.assertEqual(proc.returncode,0,proc.stderr)
             result=json.loads(out.read_text())
             self.assertEqual(result['counts']['different_pairs'],2)

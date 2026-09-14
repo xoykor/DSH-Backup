@@ -2,13 +2,12 @@ import csv
 import json
 import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 
-SCRIPT = Path(__file__).parents[1] / "scripts" / "table_transform.py"
+SCRIPT = Path(__file__).parents[1] / "scripts" / "table_transform"
 
 
 class TableTransformTest(unittest.TestCase):
@@ -25,7 +24,7 @@ class TableTransformTest(unittest.TestCase):
                 {"op": "dedupe", "keys": ["id"], "keep": "first"},
             ]}), encoding="utf-8")
             output = root / "resultado.tsv"
-            completed = subprocess.run([sys.executable, str(SCRIPT), "--input", str(source), "--output", str(output), "--operations", str(operations)], capture_output=True, text=True)
+            completed = subprocess.run([str(SCRIPT), "--input", str(source), "--output", str(output), "--operations", str(operations)], capture_output=True, text=True)
             self.assertEqual(completed.returncode, 0, completed.stderr)
             report = json.loads(completed.stdout)
             self.assertEqual((report["rows_before"], report["rows_after"], report["removed_rows"]), (4, 2, 2))
@@ -43,11 +42,11 @@ class TableTransformTest(unittest.TestCase):
             ops = root / "ops.json"
             ops.write_text(json.dumps({"operations": [{"op": "dedupe", "keys": ["id"]}]}), encoding="utf-8")
             output = root / "out.json"
-            result = subprocess.run([sys.executable, str(SCRIPT), "--input", str(source), "--output", str(output), "--operations", str(ops)], capture_output=True, text=True)
+            result = subprocess.run([str(SCRIPT), "--input", str(source), "--output", str(output), "--operations", str(ops)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(len(json.loads(output.read_text(encoding="utf-8"))), 1)
             ops.write_text(json.dumps({"operations": [{"op": "filter", "where": {"ok": {"not_empty": "yes"}}}]}), encoding="utf-8")
-            bad = subprocess.run([sys.executable, str(SCRIPT), "--input", str(source), "--output", str(root / "bad.json"), "--operations", str(ops)], capture_output=True, text=True)
+            bad = subprocess.run([str(SCRIPT), "--input", str(source), "--output", str(root / "bad.json"), "--operations", str(ops)], capture_output=True, text=True)
             self.assertEqual(bad.returncode, 2)
             self.assertIn("not_empty", bad.stderr)
 
@@ -58,7 +57,7 @@ class TableTransformTest(unittest.TestCase):
             source.write_text("id\n001\n", encoding="utf-8")
             linked = root / "linked.csv"
             os.link(source, linked)
-            result = subprocess.run([sys.executable, str(SCRIPT), "--input", str(source), "--output", str(linked)], capture_output=True, text=True)
+            result = subprocess.run([str(SCRIPT), "--input", str(source), "--output", str(linked)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 2)
             self.assertIn("overwrite", result.stderr)
             self.assertEqual(source.read_text(encoding="utf-8"), "id\n001\n")

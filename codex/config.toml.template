@@ -1,4 +1,4 @@
-model = "gpt-6-astra"
+model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 service_tier = "default"
 [projects."__HOME__"]
@@ -149,6 +149,9 @@ trust_level = "trusted"
 trust_level = "trusted"
 
 [projects."__HOME__/Documents/Codex/2026-09-14/fa"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-14/https-github-com-xoykor-avalia-o"]
 trust_level = "trusted"
 
 [desktop]

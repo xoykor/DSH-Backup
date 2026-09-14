@@ -9,6 +9,6 @@ Delimite a pergunta e a data de consulta. Antes de pesquisar, descubra no catál
 
 Faça uma busca pequena, selecione fontes primárias ou diretamente relevantes e abra o conteúdo completo com a ferramenta efetivamente disponível. Snippet de busca é pista, não evidência. Registre URL, título, data de consulta e o trecho que sustenta cada afirmação. Marque como `fact` o que a fonte declara e `inference` o que foi deduzido, explicando a ligação.
 
-Se a busca, a abertura da fonte ou a rede falhar, responda com o bloqueio e o que ainda não foi verificado; não preencha lacunas com memória. Para validar o registro antes de responder, rode `scripts/validate_research.py --input EVIDENCE.json`. A validação é local e não simula uma consulta.
+Se a busca, a abertura da fonte ou a rede falhar, responda com o bloqueio e o que ainda não foi verificado; não preencha lacunas com memória. Para validar o registro antes de responder, rode `scripts/validate_research --input EVIDENCE.json`. A validação Rust é local e não simula uma consulta.
 
 Use [fixtures/evidence.json](fixtures/evidence.json) como formato mínimo.
