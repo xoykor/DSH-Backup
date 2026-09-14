@@ -11,10 +11,10 @@ This skill is automatically active with the DSH context guard. Follow its budget
 
 - Normal operation below 65536 estimated tokens.
 - Economy mode from 65536 to 81920: use targeted reads, concise results, and diffs.
-- Checkpoint preparation from 81920 to 94371: preserve the live objective, constraints, work completed, decisions, changed files, relevant commands/results, unresolved errors, failed approaches, current state, and one next action.
-- Automatic compacting begins at 94371 estimated tokens for the local robust policy (thresholdRatio 0.72 with a 131072-token window).
+- Checkpoint preparation from 81920 to 91750: preserve the live objective, constraints, work completed, decisions, changed files, relevant commands/results, unresolved errors, failed approaches, current state, and one next action.
+- Pause → state summary → persistence → compaction begins at 91750 estimated tokens for the local robust policy (thresholdRatio 0.70 with a 131072-token window).
 
-When a durable assistant or tool result crosses the threshold, the context guard interrupts the active step immediately; compaction commits before the execution is resumed from the compacted history. Do not wait for the current step or substep to finish.
+When the threshold is reached, the executor pauses normal work, waits for the interrupted turn to settle, asks the session model for a text-only state summary of the full balanced durable history (including the latest work), flushes that summary to storage, then replaces the history and resumes. No tools execute during the summary. Preserve job IDs, artifact/log paths, uncertain side effects, failed attempts and one next action. The executor prices the summary input plus instructions and schemas, reduces its output cap if necessary, and requires input + output cap + safety margin < context capacity. A missing, truncated, failed or unsaved summary never authorizes history replacement. Compaction does not reset logical execution budgets or anti-loop evidence. Summary output reserve: 8192 tokens (including model reasoning); safety reserve: 4096 tokens.
 
 The executor measures progress from result fingerprints, successful workspace mutations, referenced files, and recent action sequences. Identical reads, repeated timeouts, and materially equivalent calls without new evidence do not reset the budget. Assistant prose is only a signal; it never counts as progress.
 

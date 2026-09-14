@@ -3,21 +3,22 @@ import assert from 'node:assert/strict';
 import { apply } from '../lib/index.js';
 
 const base = { economyTokens: 65536, checkpointTokens: 81920, compactTokens: 94371 };
-const overrides = { maxTurnMs: null, economyTokens: 32000, checkpointTokens: 40000, compactTokens: 46080, resultFingerprintChars: 3906 };
+const reserve9b = { maxTurnMs: null, compactTokens: 91750, contextWindow: 131072, summaryMaxTokens: 8192, summaryMinTokens: 1024, safetyTokens: 4096, responseMaxTokens: 24576 };
+const overrides = { maxTurnMs: null, economyTokens: 32000, checkpointTokens: 40000, compactTokens: 44800, resultFingerprintChars: 3906, contextWindow: 64000, summaryMaxTokens: 4000, summaryMinTokens: 500, safetyTokens: 2000, responseMaxTokens: 12000 };
 function harness(t) {
   const events = new Map(); const pressure = new Map(); const compactions = [];
   const service = { composedPreset: ctx => ctx.preset,
-    serviceFor: agent => ({ compactNow: async () => { compactions.push(agent.ctx.preset); return {}; } }) };
+    serviceFor: agent => ({ compactNow: async () => { throw Error('checkpointNow required'); }, checkpointNow: async (_, signal, budget) => { compactions.push(agent.ctx.preset); assert.equal(budget.contextWindow, agent.ctx.preset.endsWith('27b') ? 64000 : 131072); return {}; } }) };
   const ctx = { tools: { guard() {} }, get: () => service,
     tokenMeter: { measure: session => ({ totalTokens: pressure.get(session.id) ?? 0 }) },
     compaction: { compactNow: () => { throw Error('global compactor must not handle preset'); } },
     on: (event, cb) => events.set(event, cb) };
-  apply(ctx, { ...base, presetPolicies: { 'local-robust-9b': { maxTurnMs: null }, 'local-robust-27b': overrides } });
+  apply(ctx, { ...base, presetPolicies: { 'local-robust-9b': reserve9b, 'local-robust-27b': overrides } });
   const agents = [];
   t.after(() => agents.forEach(agent => events.get('agent/disposed')({ agent })));
   function agent(preset) {
     const cancelled = []; const steered = [];
-    const a = { id: preset, ctx: { preset }, session: { id: preset }, status: 'running',
+    const a = { id: preset, ctx: { preset }, session: { id: preset, append() {} }, status: 'running',
       cancel: reason => cancelled.push(reason), steer: message => steered.push(message), cancelled, steered };
     agents.push(a); return a;
   }
@@ -40,9 +41,9 @@ test('9B and 27B in the same guard receive different economy/checkpoint threshol
   assert.match((await h.step(small, 81920)).messages[0].source.summary, /checkpoint/);
 });
 
-test('27B compacts at 46080 through its own compactor while 9B stays active', async t => {
+test('27B checkpoints at 44800 through its own compactor while 9B stays active', async t => {
   const h = harness(t); const small = h.agent('local-robust-9b'); const large = h.agent('local-robust-27b');
-  await h.step(small, 46080); await h.step(large, 46080);
+  await h.step(small, 44800); await h.step(large, 44800);
   for (const a of [small, large]) h.events.get('session/event')(a.session, { type: 'tool/result' });
   assert.equal(small.cancelled.length, 0);
   assert.equal(large.cancelled[0].kind, 'context-guard-compaction');
@@ -50,7 +51,7 @@ test('27B compacts at 46080 through its own compactor while 9B stays active', as
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(h.compactions, ['local-robust-27b']);
   assert.equal(large.steered.length, 1);
-  h.pressure.set(small.id, 94371); h.events.get('session/event')(small.session, { type: 'tool/result' });
+  h.pressure.set(small.id, 91750); h.events.get('session/event')(small.session, { type: 'tool/result' });
   assert.equal(small.cancelled[0].kind, 'context-guard-compaction');
 });
 
@@ -59,6 +60,24 @@ test('unknown presets preserve the prior default and malformed overrides fail cl
   assert.equal((await h.step(other, 40000)).messages.length, 0);
   assert.throws(() => apply({}, { ...base, presetPolicies: { bad: { compactTokens: 1 } } }), /economyTokens/);
   assert.throws(() => apply({}, { ...base, presetPolicies: { bad: { misspelled: 1 } } }), /unknown configuration/);
+  assert.throws(() => apply({}, { ...base, ...overrides, compactTokens: 46000 }), /reserves/);
+  assert.throws(() => apply({}, { ...base, contextWindow: 64000 }), /reserves/);
+});
+
+test('normal output caps reserve space for either model checkpoint', async t => {
+  const h = harness(t);
+  for (const [preset, cap] of [['local-robust-9b', 24576], ['local-robust-27b', 12000]]) {
+    const a = h.agent(preset);
+    assert.equal((await h.events.get('agent/request')({ agent: a }, async () => ({ maxTokens: 99999 }))).maxTokens, cap);
+  }
+});
+
+test('newly committed input triggers checkpoint before normal model dispatch', async t => {
+  const h = harness(t); const a = h.agent('local-robust-27b'); await h.step(a, 1000);
+  h.pressure.set(a.id, 44800); h.events.get('session/event')(a.session, { type: 'user/message' });
+  assert.equal(a.cancelled.length, 1);
+  assert.equal((await h.step(a, 44800, 2)).kind, 'reject');
+  assert.equal(h.compactions.length, 0);
 });
 
 

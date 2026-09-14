@@ -6,6 +6,7 @@
  */
 export const name = 'dsh-context-guard';
 export const inject = ['tools', 'tokenMeter', 'compaction'];
+const CHECKPOINT_POLICY = Symbol.for('dsh.contextGuard.checkpointPolicy.v1');
 
 const DEFAULTS = Object.freeze({
   economyTokens: 131_072,
@@ -41,6 +42,7 @@ function resolveConfig(raw = {}) {
     'equivalentBlockLimit', 'maxTurnSteps', 'maxTurnToolCalls', 'maxTurnMs',
     'maxTurnTokens', 'diagnosticMaxCalls', 'diagnosticMaxMs',
     'diagnosticMaxTokens', 'textSimilarity', 'resultFingerprintChars',
+    'contextWindow', 'summaryMaxTokens', 'summaryMinTokens', 'safetyTokens', 'responseMaxTokens',
   ]);
   for (const key of Object.keys(raw)) {
     if (!knownKeys.has(key)) {
@@ -66,12 +68,25 @@ function resolveConfig(raw = {}) {
       : undefined,
     textSimilarity: raw.textSimilarity ?? DEFAULTS.textSimilarity,
     resultFingerprintChars: positiveInteger(raw.resultFingerprintChars, DEFAULTS.resultFingerprintChars, 'resultFingerprintChars'),
+    contextWindow: positiveInteger(raw.contextWindow, undefined, 'contextWindow'),
+    summaryMaxTokens: positiveInteger(raw.summaryMaxTokens, undefined, 'summaryMaxTokens'),
+    summaryMinTokens: positiveInteger(raw.summaryMinTokens, undefined, 'summaryMinTokens'),
+    safetyTokens: positiveInteger(raw.safetyTokens, undefined, 'safetyTokens'),
+    responseMaxTokens: positiveInteger(raw.responseMaxTokens, undefined, 'responseMaxTokens'),
   };
   if (!(config.economyTokens < config.checkpointTokens && config.checkpointTokens < config.compactTokens)) {
     throw new Error('dsh-context-guard: economyTokens < checkpointTokens < compactTokens is required');
   }
   if (config.diagnosticMaxCalls > config.maxTurnToolCalls) {
     throw new Error('dsh-context-guard: diagnosticMaxCalls must be <= maxTurnToolCalls');
+  }
+  const reserveKeys = ['contextWindow', 'summaryMaxTokens', 'summaryMinTokens', 'safetyTokens', 'responseMaxTokens'];
+  if (reserveKeys.some(key => config[key] !== undefined)) {
+    if (reserveKeys.some(key => config[key] === undefined)
+      || config.summaryMinTokens > config.summaryMaxTokens
+      || config.compactTokens + config.responseMaxTokens + config.summaryMaxTokens + config.safetyTokens >= config.contextWindow) {
+      throw new Error('dsh-context-guard: complete checkpoint reserves required; compactTokens + responseMaxTokens + summaryMaxTokens + safetyTokens must be < contextWindow');
+    }
   }
   if (typeof config.textSimilarity !== 'number' || config.textSimilarity < 0.8 || config.textSimilarity > 1) {
     throw new Error('dsh-context-guard: textSimilarity must be between 0.8 and 1');
@@ -440,6 +455,7 @@ function createState() {
     compactNoticed: false,
     immediateCompactionPending: false,
     immediateCompactionPromise: undefined,
+    compactionController: undefined,
     agent: undefined,
   };
 }
@@ -458,6 +474,9 @@ export function apply(ctx, rawConfig = {}) {
   }));
   const presetService = () => ctx.get?.('agentPresets') ?? ctx.agentPresets;
   const configFor = (agent) => policies.get(presetService()?.composedPreset(agent?.ctx)) ?? config;
+  // Available before the first pre-step: native middleware must not compact
+  // a resumed session before the guard has created its per-agent state.
+  ctx.provide?.('contextGuardPolicy', { forAgent: configFor });
   const states = new WeakMap();
   const sessionStates = new Map();
   const jobCalls = new WeakMap();
@@ -473,6 +492,8 @@ export function apply(ctx, rawConfig = {}) {
       if (sessionId !== undefined) sessionStates.set(sessionId, state);
     }
     state.config = configFor(agent);
+    if (state.config.contextWindow !== undefined) agent[CHECKPOINT_POLICY] = state.config;
+    else delete agent[CHECKPOINT_POLICY];
     return state;
   };
 
@@ -562,6 +583,7 @@ export function apply(ctx, rawConfig = {}) {
     state.stopReason = reason;
     state.cancelFailed = false;
     state.turnActive = false;
+    state.compactionController?.abort(new Error(reason));
     clearTurnTimers(state);
 
     // Agent cancellation aborts exec.signal. Managed subprocess executors pass
@@ -596,16 +618,32 @@ export function apply(ctx, rawConfig = {}) {
 
     const promise = (async () => {
       try {
-        const result = await compaction.compactNow(agent, new AbortController().signal);
+        const controller = new AbortController();
+        state.compactionController = controller;
+        const checkpoint = state.config.contextWindow !== undefined;
+        if (checkpoint && typeof compaction.checkpointNow !== 'function') {
+          throw new Error('checkpoint runtime patch is unavailable; refusing to compact without a saved state summary');
+        }
+        const result = checkpoint
+          ? await compaction.checkpointNow(agent, controller.signal, {
+            ...state.config,
+            onPhase: phase => { state.mode = phase === 'summarizing' ? 'summarizing' : 'compacting'; },
+          })
+          : await compaction.compactNow(agent, controller.signal);
         if (result === null) throw new Error('no compactable durable history was available');
+        controller.signal.throwIfAborted();
         state.immediateCompactionPending = false;
-        resetLogicalExecutionState(state);
-        resetTurnState(state, agent);
+        // Compaction changes context pressure, not the user's authorization or
+        // the logical execution budgets and anti-loop evidence.
+        state.mode = 'normal';
+        state.stopReason = '';
+        state.economyNoticed = state.checkpointNoticed = state.compactNoticed = false;
+        state.turnActive = false;
         agent.steer(notice(
-          'CONTEXT-GUARD: context pressure interrupted the previous step and was compacted immediately. '
+          'CONTEXT-GUARD: context pressure paused the previous step; its state summary was saved before compaction. '
             + 'Resume the current task from the compacted durable history. Do not repeat an interrupted '
             + 'side-effecting operation without checking whether it completed.',
-          'resumed after immediate context compaction',
+          'resumed from saved context checkpoint',
         ));
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -613,27 +651,42 @@ export function apply(ctx, rawConfig = {}) {
         stopTurn(
           agent,
           state,
-          'CONTEXT-GUARD STOPPED: immediate compaction failed after the context threshold was reached: '
+          'CONTEXT-GUARD STOPPED: checkpoint/compaction failed; do not resume or discard history: '
             + message,
         );
       } finally {
         state.immediateCompactionPromise = undefined;
+        state.compactionController = undefined;
       }
     })();
     state.immediateCompactionPromise = promise;
     void promise;
   };
 
-  const beginImmediateCompaction = (agent, state, totalTokens) => {
+  const preserveClaimedMessages = (agent, messages = []) => {
+    // pre-step input has been claimed from the inbox, but is not yet on the
+    // conversation surface. Keep it before cancelling that admission attempt.
+    if (!messages.length) return;
+    if (!agent.session?.append) throw new Error('cannot preserve claimed checkpoint input');
+    const existing = new Set((agent.session.deriveMessages?.() ?? []).map(message => message.id));
+    for (const message of messages) {
+      if (message.id && existing.has(message.id)) continue;
+      agent.session.append('user/message', message, { surfaceOp: 'append' });
+      if (message.id) existing.add(message.id);
+    }
+  };
+
+  const beginImmediateCompaction = (agent, state, totalTokens, messages = []) => {
     if (state.mode !== 'normal' || !state.turnActive || state.immediateCompactionPending) return;
     const reason = 'CONTEXT-GUARD: approximately ' + totalTokens
-      + ' tokens reached the compaction threshold; interrupting the active step for immediate compaction.';
+      + ' tokens reached the checkpoint threshold; pausing active work to summarize, persist, then compact.';
     state.immediateCompactionPending = true;
-    state.mode = 'compacting';
+    state.mode = state.config.contextWindow === undefined ? 'compacting' : 'summarizing';
     state.stopReason = reason;
     state.turnActive = false;
     clearTurnTimers(state);
     try {
+      preserveClaimedMessages(agent, messages);
       if (typeof agent?.cancel !== 'function') throw new Error('agent cancellation is unavailable');
       agent.cancel({ kind: 'context-guard-compaction', reason }, { keepInbox: true });
     } catch (error) {
@@ -785,8 +838,8 @@ export function apply(ctx, rawConfig = {}) {
       return 'CONTEXT-GUARD BLOCKED: this turn is already closed by the executor. '
         + state.stopReason;
     }
-    if (state.mode === 'compacting') {
-      return 'CONTEXT-GUARD BLOCKED: immediate context compaction is in progress; the interrupted turn will resume after it commits.';
+    if (state.mode === 'compacting' || state.mode === 'summarizing') {
+      return 'CONTEXT-GUARD BLOCKED: state summarization/compaction is in progress; work resumes only after the checkpoint is saved and committed.';
     }
 
     const beforeCall = budgetReason(exec.agent, state);
@@ -887,6 +940,9 @@ export function apply(ctx, rawConfig = {}) {
     if (denied) return downstream;
     const observedCall = jobCalls.get(exec);
     jobCalls.delete(exec);
+    // Settling a cancelled foreground call must not replace the checkpoint
+    // phase with diagnosis. Its durable result is included by the summarizer.
+    if (state.immediateCompactionPending) return downstream;
     const observation = observedCall?.observation;
     const resultJob = result?.value?.job;
     const validJobResult = observation?.kind === 'output' && !result?.isError
@@ -1024,7 +1080,9 @@ export function apply(ctx, rawConfig = {}) {
     if (
       state.mode === 'normal'
       && state.turnActive
-      && (event.type === 'assistant/message' || event.type === 'tool/result')
+      && (event.type === 'assistant/message' || event.type === 'tool/result'
+        || (state.config.contextWindow !== undefined
+          && ['user/message', 'system/message', 'request/header'].includes(event.type)))
     ) {
       const totalTokens = readTokenTotal(state.agent ?? undefined);
       if (totalTokens !== undefined && totalTokens >= state.config.compactTokens) {
@@ -1049,7 +1107,7 @@ export function apply(ctx, rawConfig = {}) {
     if (status !== 'idle' || !agent) return;
     const state = stateFor(agent);
     state.agent = agent;
-    if (state.mode === 'compacting' && state.immediateCompactionPending) {
+    if ((state.mode === 'compacting' || state.mode === 'summarizing') && state.immediateCompactionPending) {
       runImmediateCompaction(agent, state);
     }
   });
@@ -1057,12 +1115,14 @@ export function apply(ctx, rawConfig = {}) {
   ctx.on('agent/pre-step', async ({ agent, signal, turn, step, messages }, next) => {
     if (!agent) return next();
     const state = stateFor(agent);
+    if (state.immediateCompactionPending) {
+      preserveClaimedMessages(agent, messages);
+      return { kind: 'reject', reason: 'CONTEXT-GUARD: waiting for the saved state checkpoint and compaction.' };
+    }
     const humanAuthorization = Array.isArray(messages)
       && messages.some((message) => message?.source?.kind === 'user');
-    const isCompactionResume = Array.isArray(messages)
-      && messages.some((message) => message?.source?.kind === 'plugin' && message?.source?.plugin === name);
-    if (state.currentTurn !== turn || humanAuthorization || isCompactionResume) {
-      startTurn(agent, state, turn, step, humanAuthorization || isCompactionResume);
+    if (state.currentTurn !== turn || humanAuthorization) {
+      startTurn(agent, state, turn, step, humanAuthorization);
     }
     state.currentStep = step;
 
@@ -1078,6 +1138,13 @@ export function apply(ctx, rawConfig = {}) {
     if (reason !== undefined) {
       stopTurn(agent, state, reason);
       return { kind: 'reject', reason };
+    }
+
+    const pressure = readTokenTotal(agent);
+    if (state.config.contextWindow !== undefined && state.mode === 'normal'
+      && pressure !== undefined && pressure >= state.config.compactTokens) {
+      beginImmediateCompaction(agent, state, pressure, messages);
+      return { kind: 'reject', reason: state.stopReason };
     }
 
     const decision = await next();
@@ -1142,6 +1209,14 @@ export function apply(ctx, rawConfig = {}) {
       : decision;
   });
 
+  ctx.on('agent/request', async ({ agent }, next) => {
+    const resolved = await next();
+    if (!agent) return resolved;
+    const state = stateFor(agent);
+    if (state.config.responseMaxTokens === undefined) return resolved;
+    return { ...resolved, maxTokens: Math.min(resolved.maxTokens ?? state.config.responseMaxTokens, state.config.responseMaxTokens) };
+  });
+
   ctx.on('agent/turn-stopping', ({ agent, turn }) => {
     const state = states.get(agent);
     if (!state || state.currentTurn !== turn) return;
@@ -1153,6 +1228,8 @@ export function apply(ctx, rawConfig = {}) {
     const state = states.get(agent);
     if (!state) return;
     clearTurnTimers(state);
+    state.compactionController?.abort(new Error('agent disposed during checkpoint'));
+    delete agent[CHECKPOINT_POLICY];
     states.delete(agent);
   });
 

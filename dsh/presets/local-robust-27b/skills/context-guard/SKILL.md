@@ -9,10 +9,10 @@ This skill is automatically active with the DSH context guard. Follow its budget
 
 - Normal operation below 32000 estimated tokens.
 - Economy mode from 32000 to 40000: use targeted reads, concise results, and diffs.
-- Checkpoint preparation from 40000 to 46080: preserve the live objective, constraints, work completed, decisions, changed files, relevant commands/results, unresolved errors, failed approaches, current state, and one next action.
-- Automatic compacting begins at 46080 estimated tokens for the Local Robust 27B policy (thresholdRatio 0.72 with a 64000-token window).
+- Checkpoint preparation from 40000 to 44800: preserve the live objective, constraints, work completed, decisions, changed files, relevant commands/results, unresolved errors, failed approaches, current state, and one next action.
+- Pause → state summary → persistence → compaction begins at 44800 estimated tokens for the Local Robust 27B policy (thresholdRatio 0.70 with a 64000-token window).
 
-When a durable assistant or tool result crosses the threshold, the context guard interrupts the active step immediately; compaction commits before the execution is resumed from the compacted history. Do not wait for the current step or substep to finish.
+When the threshold is reached, the executor pauses normal work, waits for the interrupted turn to settle, asks the session model for a text-only state summary of the full balanced durable history (including the latest work), flushes that summary to storage, then replaces the history and resumes. No tools execute during the summary. Preserve job IDs, artifact/log paths, uncertain side effects, failed attempts and one next action. The executor prices the summary input plus instructions and schemas, reduces its output cap if necessary, and requires input + output cap + safety margin < context capacity. A missing, truncated, failed or unsaved summary never authorizes history replacement. Compaction does not reset logical execution budgets or anti-loop evidence. Summary output reserve: 4000 tokens (including model reasoning); safety reserve: 2000 tokens.
 
 The executor measures progress from result fingerprints, successful workspace mutations, referenced files, and recent action sequences. Identical reads, repeated timeouts, and materially equivalent calls without new evidence do not reset the budget. Assistant prose is only a signal; it never counts as progress.
 
@@ -22,4 +22,4 @@ After a timeout, the existing managed process executor must settle the process t
 
 When the guard emits `PAUSE`, it cancels the active agent turn and denies subsequent tool calls at the executor boundary. A model-written explanation or a context notice cannot override that state. A repeated cycle such as read → grep → rerun → read is closed when the tool/file/result sequence repeats, even if the individual calls are not identical.
 
-The preset retains 15625 tokens during compaction, caps its summary at 8000 tokens and normal responses at 12000 tokens. Context-related limits scale by 64000/131072; retry counts and tool/diagnostic timeouts do not scale; the whole-turn deadline is disabled. All non-context skills remain available from the shared roots.
+The guard consolidates the full balanced history, caps its checkpoint summary at 4000 tokens and normal responses at 12000 tokens. The native retention setting remains 15625 for paths that use tail retention. Context-related limits scale by 64000/131072; retry counts and tool/diagnostic timeouts do not scale; the whole-turn deadline is disabled. All non-context skills remain available from the shared roots.

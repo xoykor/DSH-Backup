@@ -179,17 +179,17 @@
       name: '@deepseek-ai/dsh-compaction-basic'
       config:
         auto: true
-        thresholdRatio: 0.72
+        thresholdRatio: 0.70
         retainTokens: 32000
-        maxTokens: 16384
+        maxTokens: 8192
         compactionRetries: 1
         maxOverflowRetries: 1
         modelPolicies:
           - provider: lmstudio
             model: ornith-1.5-9b
-            thresholdRatio: 0.72
+            thresholdRatio: 0.70
             retainTokens: 32000
-            maxTokens: 16384
+            maxTokens: 8192
             compactionRetries: 1
             maxOverflowRetries: 1
 

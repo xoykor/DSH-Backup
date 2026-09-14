@@ -34,7 +34,7 @@
   config:
     prefix: |
       You are an autonomous software engineering agent using Qwen 3.8 27B (lmstudio/qwen3.8-27b-gsq-rco) with a 64000-token context window.
-      This preset's context policy is: economy at 32000 tokens, checkpoint at 40000, automatic compaction at 46080 (72%). Retain 15625 tokens and summarize with at most 8000 tokens; normal response cap is 12000 tokens. These are the local-robust-27b values; the Local Robust 9B policy is separate.
+      This preset's context policy is: economy at 32000 tokens, checkpoint at 40000, pause for a saved state summary at 44800 (70%). Reserve at most 4000 tokens for the summary and 2000 tokens of safety margin; normal response cap is 12000 tokens. Save the summary before compacting and resuming. These are the local-robust-27b values; the Local Robust 9B policy is separate.
       Load the preset-local context-guard skill for these limits. Blocking managed-job waits remain neutral; loop counts and time budgets are unchanged.
 
       Never treat your own claim that the task is finished as evidence of completion. For non-trivial coding tasks: create a Goal, call get_goal, create a verification contract with set_verification_plan before substantive changes, perform the smallest coherent implementation, run deterministic verification, fix failures, inspect the final diff, and only then attempt to complete the Goal. Use actual tool output as evidence. A failed build, test, type check, or required verification means the task is not complete.
@@ -181,17 +181,17 @@
       name: '@deepseek-ai/dsh-compaction-basic'
       config:
         auto: true
-        thresholdRatio: 0.72
+        thresholdRatio: 0.70
         retainTokens: 15625
-        maxTokens: 8000
+        maxTokens: 4000
         compactionRetries: 1
         maxOverflowRetries: 1
         modelPolicies:
           - provider: lmstudio
             model: qwen3.8-27b-gsq-rco
-            thresholdRatio: 0.72
+            thresholdRatio: 0.70
             retainTokens: 15625
-            maxTokens: 8000
+            maxTokens: 4000
             compactionRetries: 1
             maxOverflowRetries: 1
 

@@ -340,6 +340,12 @@ runtime_job_observation_patch() {
   node "$REPO_DIR/runtime/patches/job-observation/apply-job-observation.mjs" --target "$target" "$@"
 }
 
+runtime_checkpoint_compaction_patch() {
+  local target
+  target="$(node --input-type=module -e 'import { createRequire } from "node:module"; import { realpathSync } from "node:fs"; process.stdout.write(createRequire(realpathSync(process.argv[1])).resolve("@deepseek-ai/dsh-compaction-basic"));' "$DSH_BIN")"
+  node "$REPO_DIR/runtime/patches/checkpoint-compaction/apply-checkpoint-compaction.mjs" --target "$target" "$@"
+}
+
 ensure_dsh_runtime() {
   local runtime_template="$REPO_DIR/runtime"
   local lockfile="$REPO_DIR/$RUNTIME_LOCKFILE"
@@ -383,6 +389,7 @@ ensure_dsh_runtime() {
   [[ -x "$PNPM_BIN" ]] || die "pnpm executable not found in locked runtime: $PNPM_BIN"
 
   runtime_job_observation_patch
+  runtime_checkpoint_compaction_patch
 
   mkdir -p "$DSH_INSTALL_PREFIX/bin"
   ln -sfn -- "$DSH_BIN" "$DSH_INSTALL_PREFIX/bin/dsh"
@@ -546,6 +553,7 @@ verify_current() {
   [[ "$actual" == "$DSH_VERSION" ]] \
     || die "expected DSH $DSH_VERSION, found ${actual:-unavailable}"
   runtime_job_observation_patch --check
+  runtime_checkpoint_compaction_patch --check
   verify_saved_paths
   log "verification complete"
 }

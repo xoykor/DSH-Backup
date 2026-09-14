@@ -4,11 +4,22 @@
     presetPolicies:
       local-robust-9b:
         maxTurnMs: null
+        compactTokens: 91750
+        contextWindow: 131072
+        responseMaxTokens: 24576
+        summaryMaxTokens: 8192
+        summaryMinTokens: 1024
+        safetyTokens: 4096
       local-robust-27b:
         maxTurnMs: null
+        contextWindow: 64000
+        responseMaxTokens: 12000
+        summaryMaxTokens: 4000
+        summaryMinTokens: 500
+        safetyTokens: 2000
         economyTokens: 32000
         checkpointTokens: 40000
-        compactTokens: 46080
+        compactTokens: 44800
         resultFingerprintChars: 3906
     economyTokens: 65536
     checkpointTokens: 81920
