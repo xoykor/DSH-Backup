@@ -55,7 +55,7 @@ function resolveConfig(raw = {}) {
     equivalentBlockLimit: positiveInteger(raw.equivalentBlockLimit, DEFAULTS.equivalentBlockLimit, 'equivalentBlockLimit'),
     maxTurnSteps: positiveInteger(raw.maxTurnSteps, DEFAULTS.maxTurnSteps, 'maxTurnSteps'),
     maxTurnToolCalls: positiveInteger(raw.maxTurnToolCalls, DEFAULTS.maxTurnToolCalls, 'maxTurnToolCalls'),
-    maxTurnMs: positiveInteger(raw.maxTurnMs, DEFAULTS.maxTurnMs, 'maxTurnMs'),
+    maxTurnMs: raw.maxTurnMs === null ? null : positiveInteger(raw.maxTurnMs, DEFAULTS.maxTurnMs, 'maxTurnMs'),
     maxTurnTokens: raw.maxTurnTokens !== undefined
       ? positiveInteger(raw.maxTurnTokens, undefined, 'maxTurnTokens')
       : undefined,
@@ -445,7 +445,19 @@ function createState() {
 }
 
 export function apply(ctx, rawConfig = {}) {
-  const config = resolveConfig(rawConfig);
+  const { presetPolicies = {}, ...baseConfig } = rawConfig;
+  const config = resolveConfig(baseConfig);
+  if (!presetPolicies || typeof presetPolicies !== 'object' || Array.isArray(presetPolicies)) {
+    throw new Error('dsh-context-guard: presetPolicies must be an object');
+  }
+  const policies = new Map(Object.entries(presetPolicies).map(([id, overrides]) => {
+    if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)) {
+      throw new Error('dsh-context-guard: preset policy must be an object: ' + id);
+    }
+    return [id, resolveConfig({ ...baseConfig, ...overrides })];
+  }));
+  const presetService = () => ctx.get?.('agentPresets') ?? ctx.agentPresets;
+  const configFor = (agent) => policies.get(presetService()?.composedPreset(agent?.ctx)) ?? config;
   const states = new WeakMap();
   const sessionStates = new Map();
   const jobCalls = new WeakMap();
@@ -460,6 +472,7 @@ export function apply(ctx, rawConfig = {}) {
       states.set(agent, state);
       if (sessionId !== undefined) sessionStates.set(sessionId, state);
     }
+    state.config = configFor(agent);
     return state;
   };
 
@@ -570,7 +583,8 @@ export function apply(ctx, rawConfig = {}) {
 
   const runImmediateCompaction = (agent, state) => {
     if (!state.immediateCompactionPending || state.immediateCompactionPromise) return;
-    if (!ctx.compaction || typeof ctx.compaction.compactNow !== 'function') {
+    const compaction = presetService()?.serviceFor?.(agent, 'compaction') ?? ctx.compaction;
+    if (!compaction || typeof compaction.compactNow !== 'function') {
       state.immediateCompactionPending = false;
       stopTurn(
         agent,
@@ -582,7 +596,7 @@ export function apply(ctx, rawConfig = {}) {
 
     const promise = (async () => {
       try {
-        const result = await ctx.compaction.compactNow(agent, new AbortController().signal);
+        const result = await compaction.compactNow(agent, new AbortController().signal);
         if (result === null) throw new Error('no compactable durable history was available');
         state.immediateCompactionPending = false;
         resetLogicalExecutionState(state);
@@ -656,22 +670,25 @@ export function apply(ctx, rawConfig = {}) {
     state.turnActive = true;
     state.logicalSteps += 1;
 
-    const remainingMs = Math.max(0, config.maxTurnMs - (Date.now() - state.logicalStartedAt));
-    state.turnTimer = setTimeout(() => {
-      if (state.currentTurn !== turn || !state.turnActive) return;
-      if (state.mode !== 'normal' && state.mode !== 'diagnostic') return;
-      stopTurn(
-        agent,
-        state,
-        'CONTEXT-GUARD STOPPED: the turn exceeded its total time budget of '
-          + config.maxTurnMs + 'ms; active executor work was cancelled.',
-      );
-    }, remainingMs);
-    state.turnTimer.unref?.();
+    // null disables only the whole-turn wall-clock deadline, not tool or diagnostic deadlines.
+    if (state.config.maxTurnMs !== null) {
+      const remainingMs = Math.max(0, state.config.maxTurnMs - (Date.now() - state.logicalStartedAt));
+      state.turnTimer = setTimeout(() => {
+        if (state.currentTurn !== turn || !state.turnActive) return;
+        if (state.mode !== 'normal' && state.mode !== 'diagnostic') return;
+        stopTurn(
+          agent,
+          state,
+          'CONTEXT-GUARD STOPPED: the turn exceeded its total time budget of '
+            + state.config.maxTurnMs + 'ms; active executor work was cancelled.',
+        );
+      }, remainingMs);
+      state.turnTimer.unref?.();
+    }
     if (state.mode === 'diagnostic' && state.diagnosticStartedAt > 0) {
       const diagnosticRemainingMs = Math.max(
         0,
-        config.diagnosticMaxMs - (Date.now() - state.diagnosticStartedAt),
+        state.config.diagnosticMaxMs - (Date.now() - state.diagnosticStartedAt),
       );
       state.diagnosticTimer = setTimeout(() => {
         if (state.currentTurn !== turn || !state.turnActive || state.mode !== 'diagnostic') return;
@@ -679,7 +696,7 @@ export function apply(ctx, rawConfig = {}) {
           agent,
           state,
           'CONTEXT-GUARD STOPPED: diagnostic mode exceeded its reduced time budget of '
-            + config.diagnosticMaxMs + 'ms; active executor work was cancelled.',
+            + state.config.diagnosticMaxMs + 'ms; active executor work was cancelled.',
         );
       }, diagnosticRemainingMs);
       state.diagnosticTimer.unref?.();
@@ -717,39 +734,39 @@ export function apply(ctx, rawConfig = {}) {
         agent,
         state,
         'CONTEXT-GUARD STOPPED: diagnostic mode exceeded its reduced time budget of '
-          + config.diagnosticMaxMs + 'ms; active executor work was cancelled.',
+          + state.config.diagnosticMaxMs + 'ms; active executor work was cancelled.',
       );
-    }, config.diagnosticMaxMs);
+    }, state.config.diagnosticMaxMs);
     state.diagnosticTimer.unref?.();
   };
 
   const budgetReason = (agent, state) => {
     const now = Date.now();
-    if (state.turnStartedAt > 0 && now - state.turnStartedAt >= config.maxTurnMs) {
+    if (state.config.maxTurnMs !== null && state.turnStartedAt > 0 && now - state.turnStartedAt >= state.config.maxTurnMs) {
       return 'CONTEXT-GUARD STOPPED: the turn exceeded its total time budget of '
-        + config.maxTurnMs + 'ms.';
+        + state.config.maxTurnMs + 'ms.';
     }
-    if (state.turnCalls >= config.maxTurnToolCalls) {
+    if (state.turnCalls >= state.config.maxTurnToolCalls) {
       return 'CONTEXT-GUARD STOPPED: the turn exhausted its global tool-call budget of '
-        + config.maxTurnToolCalls + '; results and the next step must be reported without another automatic call.';
+        + state.config.maxTurnToolCalls + '; results and the next step must be reported without another automatic call.';
     }
     const tokenUsage = updateTokenUsage(state, agent);
-    if (config.maxTurnTokens !== undefined && tokenUsage !== undefined && tokenUsage >= config.maxTurnTokens) {
+    if (state.config.maxTurnTokens !== undefined && tokenUsage !== undefined && tokenUsage >= state.config.maxTurnTokens) {
       return 'CONTEXT-GUARD STOPPED: the turn exhausted its global token budget of '
-        + config.maxTurnTokens + ' tokens.';
+        + state.config.maxTurnTokens + ' tokens.';
     }
     if (state.mode === 'diagnostic') {
-      if (now - state.diagnosticStartedAt >= config.diagnosticMaxMs) {
+      if (now - state.diagnosticStartedAt >= state.config.diagnosticMaxMs) {
         return 'CONTEXT-GUARD STOPPED: diagnostic mode exceeded its reduced time budget of '
-          + config.diagnosticMaxMs + 'ms.';
+          + state.config.diagnosticMaxMs + 'ms.';
       }
-      if (state.diagnosticCalls >= config.diagnosticMaxCalls) {
+      if (state.diagnosticCalls >= state.config.diagnosticMaxCalls) {
         return 'CONTEXT-GUARD STOPPED: diagnostic mode exhausted its budget of '
-          + config.diagnosticMaxCalls + ' calls.';
+          + state.config.diagnosticMaxCalls + ' calls.';
       }
-      if (config.diagnosticMaxTokens !== undefined && tokenUsage !== undefined && tokenUsage - state.diagnosticTokenBaseline >= config.diagnosticMaxTokens) {
+      if (state.config.diagnosticMaxTokens !== undefined && tokenUsage !== undefined && tokenUsage - state.diagnosticTokenBaseline >= state.config.diagnosticMaxTokens) {
         return 'CONTEXT-GUARD STOPPED: diagnostic mode exhausted its reduced token budget of '
-          + config.diagnosticMaxTokens + ' tokens.';
+          + state.config.diagnosticMaxTokens + ' tokens.';
       }
     }
     return undefined;
@@ -796,9 +813,9 @@ export function apply(ctx, rawConfig = {}) {
           + 'executor-observed code, configuration, or strategy change.';
       }
       state.diagnosticCalls += 1;
-      if (state.diagnosticCalls > config.diagnosticMaxCalls) {
+      if (state.diagnosticCalls > state.config.diagnosticMaxCalls) {
         const reason = 'CONTEXT-GUARD STOPPED: diagnostic mode allows only '
-          + config.diagnosticMaxCalls + ' calls after a timeout.';
+          + state.config.diagnosticMaxCalls + ' calls after a timeout.';
         stopTurn(exec.agent, state, reason);
         return reason;
       }
@@ -821,7 +838,7 @@ export function apply(ctx, rawConfig = {}) {
     const stagnantAttempts = state.stagnantActionCounts.get(key) ?? 0;
     const near = state.actionSamples.some((sample) => (
       sample.name === exec.name
-      && similarity(sample.args, args) >= config.textSimilarity
+      && similarity(sample.args, args) >= state.config.textSimilarity
     ));
 
     const familyHint = errorFamilyHint(exec.name, exec.arguments);
@@ -831,7 +848,7 @@ export function apply(ctx, rawConfig = {}) {
       ? (state.failureFamilyCounts.get(state.lastFailureFamily) ?? 0)
       : 0;
     if (
-      familyCount >= config.noProgressLimit
+      familyCount >= state.config.noProgressLimit
       && state.failureFamilyVersion.get(state.lastFailureFamily) === state.changeVersion
     ) {
       const reason = 'CONTEXT-GUARD STOPPED: ' + exec.name
@@ -841,15 +858,15 @@ export function apply(ctx, rawConfig = {}) {
       return reason;
     }
 
-    if (stagnantAttempts >= config.equivalentBlockLimit) {
+    if (stagnantAttempts >= state.config.equivalentBlockLimit) {
       const reason = 'CONTEXT-GUARD STOPPED: ' + exec.name
-        + ' reached ' + config.equivalentBlockLimit
+        + ' reached ' + state.config.equivalentBlockLimit
         + ' equivalent attempts without a new result'
         + (near ? ' (near-equivalent calls were also observed).' : '.');
       stopTurn(exec.agent, state, reason);
       return reason;
     }
-    if (state.noProgress >= config.noProgressLimit && (state.lastFailureFamily === '' || familyCount > 0)) {
+    if (state.noProgress >= state.config.noProgressLimit && (state.lastFailureFamily === '' || familyCount > 0)) {
       const reason = 'CONTEXT-GUARD PAUSE: ' + state.noProgress
         + ' consecutive actions produced no new executor evidence. The executor '
         + 'closed the turn; inspect the latest failure in a new user turn.'
@@ -882,7 +899,7 @@ export function apply(ctx, rawConfig = {}) {
     if (validJobResult && TERMINAL_JOB_STATES.has(resultJob.status)) state.collectedJobs.add(resultJob.id);
     const args = canonical(observationArguments(exec, observation));
     const key = String(exec.name) + '\u0000' + args;
-    const fingerprint = observationFingerprint(result, observation, config.resultFingerprintChars);
+    const fingerprint = observationFingerprint(result, observation, state.config.resultFingerprintChars);
 
     // An executor-confirmed wait is neutral: it neither consumes investigation
     // retries nor clears previous failures. Empty output is not lack of job
@@ -960,29 +977,29 @@ export function apply(ctx, rawConfig = {}) {
     }
 
     const tokenUsage = updateTokenUsage(state, exec.agent);
-    if (state.turnCalls >= config.maxTurnToolCalls && state.inFlightCalls === 0) {
+    if (state.turnCalls >= state.config.maxTurnToolCalls && state.inFlightCalls === 0) {
       stopTurn(
         exec.agent,
         state,
         'CONTEXT-GUARD STOPPED: the turn exhausted its global tool-call budget of '
-          + config.maxTurnToolCalls + '.',
+          + state.config.maxTurnToolCalls + '.',
       );
-    } else if (config.maxTurnTokens !== undefined && tokenUsage !== undefined && tokenUsage >= config.maxTurnTokens) {
+    } else if (state.config.maxTurnTokens !== undefined && tokenUsage !== undefined && tokenUsage >= state.config.maxTurnTokens) {
       stopTurn(
         exec.agent,
         state,
         'CONTEXT-GUARD STOPPED: the turn exhausted its global token budget of '
-          + config.maxTurnTokens + ' tokens.',
+          + state.config.maxTurnTokens + ' tokens.',
       );
     } else if (
       state.mode === 'diagnostic'
-      && state.diagnosticCalls >= config.diagnosticMaxCalls
+      && state.diagnosticCalls >= state.config.diagnosticMaxCalls
     ) {
       stopTurn(
         exec.agent,
         state,
         'CONTEXT-GUARD STOPPED: diagnostic mode exhausted its budget of '
-          + config.diagnosticMaxCalls + ' calls.',
+          + state.config.diagnosticMaxCalls + ' calls.',
       );
     }
     return downstream;
@@ -1010,7 +1027,7 @@ export function apply(ctx, rawConfig = {}) {
       && (event.type === 'assistant/message' || event.type === 'tool/result')
     ) {
       const totalTokens = readTokenTotal(state.agent ?? undefined);
-      if (totalTokens !== undefined && totalTokens >= config.compactTokens) {
+      if (totalTokens !== undefined && totalTokens >= state.config.compactTokens) {
         beginImmediateCompaction(state.agent, state, totalTokens);
       }
     }
@@ -1021,7 +1038,7 @@ export function apply(ctx, rawConfig = {}) {
       .join('\n');
     const normalized = normalizedText(text);
     if (normalized.length < 80) return;
-    if (similarity(state.lastAssistantText, normalized) >= config.textSimilarity) {
+    if (similarity(state.lastAssistantText, normalized) >= state.config.textSimilarity) {
       state.repeatedAssistantText = true;
       state.noProgress += 1;
     }
@@ -1052,9 +1069,9 @@ export function apply(ctx, rawConfig = {}) {
     let reason;
     if (state.mode === 'stopped' || state.mode === 'paused') {
       reason = state.stopReason;
-    } else if (state.logicalSteps > config.maxTurnSteps) {
+    } else if (state.logicalSteps > state.config.maxTurnSteps) {
       reason = 'CONTEXT-GUARD STOPPED: turn ' + turn
-        + ' exceeded the hard limit of ' + config.maxTurnSteps + ' steps.';
+        + ' exceeded the hard limit of ' + state.config.maxTurnSteps + ' steps.';
     } else {
       reason = budgetReason(agent, state);
     }
@@ -1081,7 +1098,7 @@ export function apply(ctx, rawConfig = {}) {
           + record.tool
           + '; duration=' + (record.durationMs ?? 'unknown')
           + 'ms; diagnostic calls remaining='
-          + Math.max(0, config.diagnosticMaxCalls - state.diagnosticCalls)
+          + Math.max(0, state.config.diagnosticMaxCalls - state.diagnosticCalls)
           + '. The prior output is recorded immediately before this notice. '
           + 'Use executor-marked job_output/job_list to observe managed background work. '
           + 'A pending wait is not an execution timeout. Goal edits and arbitrary shell probes '
@@ -1089,7 +1106,7 @@ export function apply(ctx, rawConfig = {}) {
           + 'real executor-observed change.',
         'diagnostic mode after executor timeout',
       ));
-    } else if (totalTokens !== undefined && totalTokens >= config.compactTokens && !state.compactNoticed) {
+    } else if (totalTokens !== undefined && totalTokens >= state.config.compactTokens && !state.compactNoticed) {
       state.compactNoticed = true;
       injected.push(notice(
         'CONTEXT BUDGET: approximately ' + totalTokens
@@ -1099,7 +1116,7 @@ export function apply(ctx, rawConfig = {}) {
           + 'one concrete next step.',
         'context compact due (~' + totalTokens + ' tokens)',
       ));
-    } else if (totalTokens !== undefined && totalTokens >= config.checkpointTokens && !state.checkpointNoticed) {
+    } else if (totalTokens !== undefined && totalTokens >= state.config.checkpointTokens && !state.checkpointNoticed) {
       state.checkpointNoticed = true;
       injected.push(notice(
         'CONTEXT BUDGET: approximately ' + totalTokens
@@ -1107,7 +1124,7 @@ export function apply(ctx, rawConfig = {}) {
           + 'approach plus the next concrete step before compaction.',
         'checkpoint preparation (~' + totalTokens + ' tokens)',
       ));
-    } else if (totalTokens !== undefined && totalTokens >= config.economyTokens && !state.economyNoticed) {
+    } else if (totalTokens !== undefined && totalTokens >= state.config.economyTokens && !state.economyNoticed) {
       state.economyNoticed = true;
       injected.push(notice(
         'CONTEXT BUDGET: approximately ' + totalTokens

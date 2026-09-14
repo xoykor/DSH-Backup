@@ -27,9 +27,9 @@
         maxOverflowRetries: 1
       - provider: lmstudio
         model: qwen3.8-27b-gsq-rco
-        thresholdRatio: 0.918426513671875
-        retainTokens: 6000
-        maxTokens: 16384
+        thresholdRatio: 0.72
+        retainTokens: 15625
+        maxTokens: 8000
         compactionRetries: 1
         maxOverflowRetries: 1
 - id: command-compact
@@ -51,6 +51,15 @@
 # Explicit local robust defaults for every host loading context-guard.
 - id: context-guard
   config:
+    presetPolicies:
+      local-robust-9b:
+        maxTurnMs: null
+      local-robust-27b:
+        maxTurnMs: null
+        economyTokens: 32000
+        checkpointTokens: 40000
+        compactTokens: 46080
+        resultFingerprintChars: 3906
     economyTokens: 65536
     checkpointTokens: 81920
     compactTokens: 94371

@@ -9,7 +9,9 @@ errors as evidence.
 
 This policy is always active for DSH sessions, especially local models such as Qwen 3.5 9B. The harness independently measures context and blocks repeated tool loops; comply with its notices immediately.
 
-Use context deliberately. Below 65536 tokens, work normally. At 65536–81920, prefer relevant excerpts, bounded output, diffs, and the most recent useful result. Do not reread unchanged files or repeat an already-conclusive command. At 81920–94371, prepare for a compact checkpoint: preserve the objective, user requirements, completed work, decisions, modified files, important changes, relevant commands and results, unresolved errors, failed attempts, current project state, and exactly one next action. At 94371, rely on automatic compaction and continue from the resulting checkpoint rather than rebuilding old history.
+For Local Robust 27B (Qwen 3.8 27B, 64000-token window), use economy at 32000 tokens, checkpoint at 40000 and compaction at 46080. Its preset-local `context-guard` skill supplies the matching policy. These values override the 9B/default ranges in the following paragraph only for that preset.
+
+For Local Robust 9B and other presets using the existing default policy, use context deliberately. Below 65536 tokens, work normally. At 65536–81920, prefer relevant excerpts, bounded output, diffs, and the most recent useful result. Do not reread unchanged files or repeat an already-conclusive command. At 81920–94371, prepare for a compact checkpoint: preserve the objective, user requirements, completed work, decisions, modified files, important changes, relevant commands and results, unresolved errors, failed attempts, current project state, and exactly one next action. At 94371, rely on automatic compaction and continue from the resulting checkpoint rather than rebuilding old history.
 
 When the compaction threshold is crossed by a durable assistant or tool result, the context guard interrupts the active step immediately, commits compaction, and then resumes from the compacted history. Do not wait for the current step or substep to finish.
 
@@ -33,3 +35,5 @@ return await tools.write({ file_path: "...", content });
 ```
 
 Use `JSON.stringify(value)` for generated JSON/object content. Escape a backtick or `${` only when it occurs in the content, keep writes short and auditable, and after a parse failure change the representation before retrying.
+
+Local Robust 9B and Local Robust 27B disable the whole-turn wall-clock deadline (`maxTurnMs: null`). Do not stop solely because 15 minutes elapsed. Anti-loop checks, call/step limits, tool-specific timeouts and the diagnostic budget remain enforced.

@@ -14,8 +14,13 @@ const TEMPERATURE = 1.0;
 const REASONING_EFFORT = 'high';
 
 export function apply(ctx) {
-  ctx.on('agent/request', async (_payload, next) => {
-    const resolved = await next();
+  ctx.on('agent/request', async (payload, next) => {
+    let resolved = await next();
+    const presets = ctx.get?.('agentPresets') ?? ctx.agentPresets;
+    if (presets?.composedPreset(payload.agent?.ctx) === 'local-robust-27b') {
+      resolved = { ...resolved, provider: PROVIDER, model: MODEL,
+        maxTokens: Math.min(resolved.maxTokens ?? 12000, 12000) };
+    }
     if (resolved.provider !== PROVIDER || resolved.model !== MODEL) {
       return resolved;
     }

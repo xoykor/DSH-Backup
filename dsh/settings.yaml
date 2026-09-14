@@ -32,9 +32,23 @@ llm-pi-ai:
       streamIdleTimeoutMs: 900000
       models:
         - id: ornith-1.5-9b
-          input: [ text, image ]
           maxTokens: 24576
+          input:
+            - text
+            - image
         - id: qwen3.8-27b-gsq-rco
+          name: Qwen 3.8 27B GSQ RCO
+          contextWindow: 64000
+          maxTokens: 12000
+          input: [text, image]
+          reasoningEfforts:
+            off: "off"
+            minimal: "on"
+            low: "on"
+            medium: "on"
+            high: "on"
+            xhigh: "on"
+            max: "on"
 agent-default-model:
   provider: lmstudio
   model: ornith-1.5-9b

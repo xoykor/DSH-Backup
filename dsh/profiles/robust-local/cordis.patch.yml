@@ -1,6 +1,15 @@
 # Isolated robust-local host policy. This layer does not affect other profiles.
 - id: context-guard
   config:
+    presetPolicies:
+      local-robust-9b:
+        maxTurnMs: null
+      local-robust-27b:
+        maxTurnMs: null
+        economyTokens: 32000
+        checkpointTokens: 40000
+        compactTokens: 46080
+        resultFingerprintChars: 3906
     economyTokens: 65536
     checkpointTokens: 81920
     compactTokens: 94371
