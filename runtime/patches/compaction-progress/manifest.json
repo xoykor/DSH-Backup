@@ -1,0 +1,7 @@
+{
+  "package": "@deepseek-ai/dsh-client-ui-chat",
+  "version": "0.1.5-rc.2",
+  "relativeTarget": "lib/client.js",
+  "baseSha256": "6527556d25c7b2a27f2e3bfb96cc2ae3d9244f1213147e245b17684ad8d9e396",
+  "patchedSha256": "38103e1d27f4e0bc0495293f334c40647df04949a9fd3adbcbe27272d3925154"
+}

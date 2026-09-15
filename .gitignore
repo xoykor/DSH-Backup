@@ -27,6 +27,7 @@ dsh/storages/
 dsh/compaction-*/
 codex/*history*
 **/compaction-*/
+!runtime/patches/compaction-progress/
 
 # Local restore artifacts
 .restore-backups/

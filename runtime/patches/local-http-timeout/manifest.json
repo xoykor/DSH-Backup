@@ -1,0 +1,7 @@
+{
+  "package": "@deepseek-ai/dsh-llm-pi-ai",
+  "version": "0.1.5-rc.2",
+  "relativeTarget": "lib/index.js",
+  "baseSha256": "1f787eb5cd3d0308e7a2563cdb2b8cc2c1fc153fe06b55d39439fb2446059483",
+  "patchedSha256": "8c0573d4ae080c743b2a8449d23f64a878b97b1f4d0a6d21659e8e9ca03642b5"
+}

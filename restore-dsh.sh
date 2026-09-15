@@ -352,6 +352,18 @@ runtime_goal_round_compaction_patch() {
   node "$REPO_DIR/runtime/patches/goal-round-compaction/apply-goal-round-compaction.mjs" --target "$target" "$@"
 }
 
+runtime_compaction_progress_patch() {
+  local target
+  target="$(node --input-type=module -e 'import { createRequire } from "node:module"; import { realpathSync } from "node:fs"; import { dirname, join } from "node:path"; process.stdout.write(join(dirname(createRequire(realpathSync(process.argv[1])).resolve("@deepseek-ai/dsh-client-ui-chat/package.json")), "lib/client.js"));' "$DSH_BIN")"
+  node "$REPO_DIR/runtime/patches/compaction-progress/apply-compaction-progress.mjs" --target "$target" "$@"
+}
+
+runtime_local_http_timeout_patch() {
+  local target
+  target="$(node --input-type=module -e 'import { createRequire } from "node:module"; import { realpathSync } from "node:fs"; process.stdout.write(createRequire(realpathSync(process.argv[1])).resolve("@deepseek-ai/dsh-llm-pi-ai"));' "$DSH_BIN")"
+  node "$REPO_DIR/runtime/patches/local-http-timeout/apply-local-http-timeout.mjs" --target "$target" "$@"
+}
+
 ensure_dsh_runtime() {
   local runtime_template="$REPO_DIR/runtime"
   local lockfile="$REPO_DIR/$RUNTIME_LOCKFILE"
@@ -397,6 +409,8 @@ ensure_dsh_runtime() {
   runtime_job_observation_patch
   runtime_checkpoint_compaction_patch
   runtime_goal_round_compaction_patch
+  runtime_compaction_progress_patch
+  runtime_local_http_timeout_patch
 
   mkdir -p "$DSH_INSTALL_PREFIX/bin"
   ln -sfn -- "$DSH_BIN" "$DSH_INSTALL_PREFIX/bin/dsh"
@@ -562,6 +576,8 @@ verify_current() {
   runtime_job_observation_patch --check
   runtime_checkpoint_compaction_patch --check
   runtime_goal_round_compaction_patch --check
+  runtime_compaction_progress_patch --check
+  runtime_local_http_timeout_patch --check
   verify_saved_paths
   log "verification complete"
 }
