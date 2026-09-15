@@ -28,7 +28,7 @@
     economyTokens: 65536
     checkpointTokens: 81920
     compactTokens: 94371
-    noProgressLimit: 3
+    noProgressLimit: 7
     equivalentBlockLimit: 5
     maxTurnSteps: 48
     maxTurnToolCalls: 48

@@ -74,6 +74,18 @@ test('unlimited work still blocks unchanged repeated investigation', async t => 
   assert.ok(reasons.some(Boolean) || h.cancellations.length > 0);
 });
 
+test('default no-progress guard allows seven distinct failures before stopping', async t => {
+  const h = await harness(t, { equivalentBlockLimit: 20 });
+  const failure = { isError: true, value: { exitCode: 1, error: 'ENOENT' } };
+  for (let i = 0; i < 7; i++) {
+    assert.equal(await h.call('bash', { command: `false --variant=${i}` }, failure), undefined);
+  }
+  assert.match(
+    await h.call('bash', { command: 'false --variant=final' }, failure),
+    /7 equivalent failures/,
+  );
+});
+
 test('unlimited work retains the diagnostic budget after a real timeout', async t => {
   const h = await harness(t, { maxTurnToolCalls: null, maxTurnSteps: null, maxTurnMs: null });
   await h.call('bash', { command: 'slow' }, timeout);
@@ -172,7 +184,7 @@ test('a real second timeout still stops diagnosis even on an observer', async (t
 });
 
 test('neutral observations never erase earlier equivalent failures', async (t) => {
-  const h = await harness(t);
+  const h = await harness(t, { noProgressLimit: 3 });
   const failure = { isError: true, value: { exitCode: 1, error: 'ENOENT' } };
   for (let i = 0; i < 3; i++) {
     assert.equal(await h.call('bash', { command: 'cat missing.txt' }, failure), undefined);
