@@ -53,6 +53,8 @@
   config:
     presetPolicies:
       local-robust-9b:
+        maxTurnSteps: null
+        maxTurnToolCalls: null
         maxTurnMs: null
         compactTokens: 91750
         contextWindow: 131072
@@ -61,6 +63,8 @@
         summaryMinTokens: 1024
         safetyTokens: 4096
       local-robust-27b:
+        maxTurnSteps: null
+        maxTurnToolCalls: null
         maxTurnMs: null
         contextWindow: 64000
         responseMaxTokens: 12000

@@ -55,8 +55,8 @@ function resolveConfig(raw = {}) {
     compactTokens: positiveInteger(raw.compactTokens, DEFAULTS.compactTokens, 'compactTokens'),
     noProgressLimit: positiveInteger(raw.noProgressLimit, DEFAULTS.noProgressLimit, 'noProgressLimit'),
     equivalentBlockLimit: positiveInteger(raw.equivalentBlockLimit, DEFAULTS.equivalentBlockLimit, 'equivalentBlockLimit'),
-    maxTurnSteps: positiveInteger(raw.maxTurnSteps, DEFAULTS.maxTurnSteps, 'maxTurnSteps'),
-    maxTurnToolCalls: positiveInteger(raw.maxTurnToolCalls, DEFAULTS.maxTurnToolCalls, 'maxTurnToolCalls'),
+    maxTurnSteps: raw.maxTurnSteps === null ? null : positiveInteger(raw.maxTurnSteps, DEFAULTS.maxTurnSteps, 'maxTurnSteps'),
+    maxTurnToolCalls: raw.maxTurnToolCalls === null ? null : positiveInteger(raw.maxTurnToolCalls, DEFAULTS.maxTurnToolCalls, 'maxTurnToolCalls'),
     maxTurnMs: raw.maxTurnMs === null ? null : positiveInteger(raw.maxTurnMs, DEFAULTS.maxTurnMs, 'maxTurnMs'),
     maxTurnTokens: raw.maxTurnTokens !== undefined
       ? positiveInteger(raw.maxTurnTokens, undefined, 'maxTurnTokens')
@@ -77,7 +77,7 @@ function resolveConfig(raw = {}) {
   if (!(config.economyTokens < config.checkpointTokens && config.checkpointTokens < config.compactTokens)) {
     throw new Error('dsh-context-guard: economyTokens < checkpointTokens < compactTokens is required');
   }
-  if (config.diagnosticMaxCalls > config.maxTurnToolCalls) {
+  if (config.maxTurnToolCalls !== null && config.diagnosticMaxCalls > config.maxTurnToolCalls) {
     throw new Error('dsh-context-guard: diagnosticMaxCalls must be <= maxTurnToolCalls');
   }
   const reserveKeys = ['contextWindow', 'summaryMaxTokens', 'summaryMinTokens', 'safetyTokens', 'responseMaxTokens'];
@@ -799,7 +799,7 @@ export function apply(ctx, rawConfig = {}) {
       return 'CONTEXT-GUARD STOPPED: the turn exceeded its total time budget of '
         + state.config.maxTurnMs + 'ms.';
     }
-    if (state.turnCalls >= state.config.maxTurnToolCalls) {
+    if (state.config.maxTurnToolCalls !== null && state.turnCalls >= state.config.maxTurnToolCalls) {
       return 'CONTEXT-GUARD STOPPED: the turn exhausted its global tool-call budget of '
         + state.config.maxTurnToolCalls + '; results and the next step must be reported without another automatic call.';
     }
@@ -1033,7 +1033,7 @@ export function apply(ctx, rawConfig = {}) {
     }
 
     const tokenUsage = updateTokenUsage(state, exec.agent);
-    if (state.turnCalls >= state.config.maxTurnToolCalls && state.inFlightCalls === 0) {
+    if (state.config.maxTurnToolCalls !== null && state.turnCalls >= state.config.maxTurnToolCalls && state.inFlightCalls === 0) {
       stopTurn(
         exec.agent,
         state,
@@ -1129,7 +1129,7 @@ export function apply(ctx, rawConfig = {}) {
     let reason;
     if (state.mode === 'stopped' || state.mode === 'paused') {
       reason = state.stopReason;
-    } else if (state.logicalSteps > state.config.maxTurnSteps) {
+    } else if (state.config.maxTurnSteps !== null && state.logicalSteps > state.config.maxTurnSteps) {
       reason = 'CONTEXT-GUARD STOPPED: turn ' + turn
         + ' exceeded the hard limit of ' + state.config.maxTurnSteps + ' steps.';
     } else {
