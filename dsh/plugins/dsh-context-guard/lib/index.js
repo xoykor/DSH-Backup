@@ -12,7 +12,7 @@ const DEFAULTS = Object.freeze({
   economyTokens: 131_072,
   checkpointTokens: 163_840,
   compactTokens: 188_743,
-  noProgressLimit: 7,
+  noProgressLimit: 3,
   equivalentBlockLimit: 5,
   maxTurnSteps: 48,
   maxTurnToolCalls: 48,

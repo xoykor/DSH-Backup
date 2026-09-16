@@ -3,6 +3,7 @@
   "private": true,
   "dependencies": {
     "dsh-context-guard": "file:__DSH_HOME__/plugins/dsh-context-guard",
+    "dsh-continue-button": "link:__DSH_HOME__/plugins/dsh-continue-button",
     "dsh-global-token-meter": "link:__DSH_HOME__/plugins/dsh-global-token-meter",
     "relay-dsh-plugin-codex": "0.2.2"
   },
@@ -13,6 +14,7 @@
         "@deepseek-ai/dsh-web-app",
         "relay-dsh-plugin-codex",
         "dsh-context-guard",
+        "dsh-continue-button",
         "dsh-global-token-meter"
       ],
       "patchReload": "live"

@@ -1,0 +1,172 @@
+{
+  "name": "dsh-doublecheck",
+  "version": "0.9.11",
+  "description": "Delivery quality gate for DeepSeek Harness: grill the requirements, test the implementation, prove the delivery, and gate the handoff with a deliverable/rework decision.",
+  "packageManager": "pnpm@11.7.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PerryLink/dsh-doublecheck.git"
+  },
+  "homepage": "https://github.com/PerryLink/dsh-doublecheck#readme",
+  "bugs": {
+    "url": "https://github.com/PerryLink/dsh-doublecheck/issues"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "bin": {
+    "doublecheck-gate": "lib/ci.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "import": "./lib/index.js"
+    },
+    "./grill": {
+      "types": "./lib/grill/index.d.ts",
+      "import": "./lib/grill/index.js"
+    },
+    "./guard": {
+      "types": "./lib/guard/index.d.ts",
+      "import": "./lib/guard/index.js"
+    },
+    "./invariant": {
+      "types": "./lib/invariant.d.ts",
+      "import": "./lib/invariant.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "files": [
+    "lib",
+    "skills",
+    "cordis.patch.yml",
+    "strict.patch.yml",
+    "CHANGELOG.md",
+    "README.md",
+    "README-zh.md",
+    "README-es.md",
+    "README-pt.md",
+    "README-hi.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc --noEmitOnError && node scripts/fix-dts.mjs",
+    "prepare": "tsc --noEmitOnError && node scripts/fix-dts.mjs",
+    "prepublishOnly": "pnpm run typecheck:ci && tsc --noEmitOnError && node scripts/fix-dts.mjs && pnpm run test",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json",
+    "typecheck:ci": "tsc -p tsconfig.ci.json --noEmit",
+    "lint": "eslint src tests",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "verify:skills": "node scripts/verify-skills.mjs",
+    "check:readmes": "node scripts/check-readme-sync.mjs",
+    "verify:self-contained": "node scripts/verify-self-contained.mjs",
+    "verify:artifacts": "node scripts/verify-artifacts.mjs",
+    "pack:check": "pnpm run build && pnpm pack"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "engineering-discipline",
+    "requirements",
+    "guard",
+    "skill",
+    "quality-gate",
+    "delivery-gate"
+  ],
+  "author": "PerryLink",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dshWorkshop": {
+    "schema": "omdsh-workshop-package/v1",
+    "type": "plugin",
+    "integration": {
+      "protocol": "harness-profile",
+      "artifact": "cordis.patch.yml"
+    },
+    "install": {
+      "mode": "transactional",
+      "adapter": "profile-bundle",
+      "failurePolicy": "generation-rollback",
+      "touchesCurrentBeforeActivation": false
+    },
+    "lifecycle": {
+      "activation": "restart-profile",
+      "dispose": "supported"
+    },
+    "permissions": [
+      "filesystem:read",
+      "filesystem:write"
+    ],
+    "compatibility": {
+      "dshVersions": ["0.1.2-rc.1","0.1.5-rc.2"]
+    },
+    "capability": {
+      "id": "doublecheck",
+      "kind": "command",
+      "invocation": "send /gate status in a session with the plugin rows loaded",
+      "expected": "a reply reporting the live checklist progress (requirements/test evidence phases), the latest gate run verdict with red items, and the plan-mode state"
+    },
+    "evidence": {
+      "install": null,
+      "failureIsolation": null,
+      "hotReload": null,
+      "remove": null
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-agent": ">=0.1.2-rc.1 <0.2.0 || >=0.1.5-alpha.1 <0.2.0",
+    "@deepseek-ai/dsh-commands": ">=0.1.2-rc.1 <0.2.0 || >=0.1.5-alpha.1 <0.2.0",
+    "@deepseek-ai/dsh-invariants": ">=0.1.2-rc.1 <0.2.0 || >=0.1.5-alpha.1 <0.2.0",
+    "@deepseek-ai/dsh-llm": ">=0.1.2-rc.1 <0.2.0 || >=0.1.5-alpha.1 <0.2.0",
+    "@deepseek-ai/dsh-session": ">=0.1.2-rc.1 <0.2.0 || >=0.1.5-alpha.1 <0.2.0",
+    "@deepseek-ai/dsh-session-projection": ">=0.1.2-rc.1 <0.2.0 || >=0.1.5-alpha.1 <0.2.0",
+    "@deepseek-ai/dsh-skill": ">=0.1.2-rc.1 <0.2.0 || >=0.1.5-alpha.1 <0.2.0",
+    "@deepseek-ai/dsh-tools": ">=0.1.2-rc.1 <0.2.0 || >=0.1.5-alpha.1 <0.2.0",
+    "@deepseek-ai/schemastery": "^3.18.2"
+  },
+  "dependencies": {
+    "typescript": "^5.7.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/cordis-plugin-loader": "^1.0.3",
+    "@deepseek-ai/dsh-agent": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-commands": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-fs": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-llm": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-session": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-session-projection": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-settings": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-skill": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-subagent": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-system-prompt": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-tools": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-workflow": "0.1.5-rc.2",
+    "@deepseek-ai/schemastery": "^3.18.2",
+    "@eslint/js": "^9.30.0",
+    "@types/node": "^22.15.0",
+    "@vitest/coverage-v8": "^3.2.0",
+    "eslint": "^9.30.0",
+    "typescript-eslint": "^8.35.0",
+    "vitest": "^3.2.0"
+  },
+  "funding": {
+    "type": "individual",
+    "url": "https://github.com/sponsors/PerryLink"
+  }
+}

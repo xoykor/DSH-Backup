@@ -1,0 +1,19 @@
+# dsh-doublecheck bundle patch: the engineering-discipline layer.
+# Both rows activate whenever their services exist. Every tuning key has a
+# Schema default (see the Config schemas in src/grill and src/guard) — this
+# patch restates only deliberate deviations, and a patch replaces a row's
+# WHOLE config, so an override here must restate every key it needs.
+- insert:
+    # The grill module: the bundled grill-requirements skill and the
+    # model-facing spec/catalog/report tools. Disable this row to remove
+    # the skill and tools together.
+    - id: doublecheck-grill
+      name: 'dsh-doublecheck/grill'
+
+    # The discipline guard: the grill gate (requirements-less edits on vague
+    # tasks), the red/green evidence gates (modules.tdd), and the adversary
+    # review (modules.adversary: a forked critic audits the delivery once it
+    # reaches green). All gates can be switched off per session with
+    # /doublecheck on|off (durable, survives restore).
+    - id: doublecheck-guard
+      name: 'dsh-doublecheck/guard'

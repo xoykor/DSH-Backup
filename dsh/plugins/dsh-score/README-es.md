@@ -1,0 +1,262 @@
+<div align="center">
+
+# 🏆 dsh-score
+- **Canal 1024 store**: `npm i -g dsh1024` una vez, luego `dsh1024 plugin --profile web add dsh-score` (cuenta para el ranking de instalaciones de [deepseek1024.com](https://deepseek1024.com)).
+
+**Puntuación de calidad multidimensional para plugins de DeepSeek Harness.**
+
+*Cinco dimensiones, evidencia real de los CLI `gh`/`npm`, una tarjeta de riesgo ponderada y tabla de clasificación.*
+
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Gitee](https://img.shields.io/badge/Gitee-mirror-c71d23?logo=gitee)](https://gitee.com/perrylink/dsh-score)
+[![DSH plugin](https://img.shields.io/badge/dsh--plugin-✅-green)](https://github.com/topics/dsh-plugin)
+[![dsh-doctor](https://raw.githubusercontent.com/PerryLink/dsh-plugin-doctor/main/badges/PerryLink__dsh-score.svg)](https://github.com/PerryLink/dsh-plugin-doctor#verified-徽章)
+[![Node](https://img.shields.io/badge/node-%5E22.19%20%7C%7C%20%3E%3D24-brightgreen.svg)](#)
+[![CI](https://img.shields.io/github/actions/workflow/status/PerryLink/dsh-score/ci.yml?branch=main&label=CI)](https://github.com/PerryLink/dsh-score/actions)
+[![Version](https://img.shields.io/github/v/tag/PerryLink/dsh-score?label=version)](https://github.com/PerryLink/dsh-score/releases)
+[![npm version](https://img.shields.io/npm/v/dsh-score)](https://www.npmjs.com/package/dsh-score)
+[![npm downloads](https://img.shields.io/npm/dm/dsh-score)](https://www.npmjs.com/package/dsh-score)
+
+[English](README.md) · [简体中文](README-zh.md) · [Español](README-es.md) · [Português](README-pt.md) · [हिन्दी](README-hi.md)
+
+</div>
+
+---
+
+## Compatibilidad
+
+| Componente | Versión |
+|---|---|
+| DeepSeek Harness | **`dsh-v0.1.5-rc.2`** (etiqueta de GitHub; verificado el 2026-09-11: puertas de tipos, suites unitarias/de ensamblaje, build de artefactos). Línea npm publicada `0.1.5-rc.2` (el `latest`/`next` de npm ya son `0.1.5-rc.2`; dependencias entre pares `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0`). |
+| Node.js | `^22.19.0 \|\| >=24.0.0` |
+| Gestor de paquetes | `pnpm@11.7.0` |
+| Plataforma | Windows / macOS / Linux (plugin solo host) |
+| Herramientas externas | CLI `gh` en PATH (autenticado), CLI `npm` en PATH |
+
+## Qué obtienes
+
+- Herramienta `score` — un objetivo por la canalización de cinco dimensiones; devuelve la tarjeta de riesgo estructurada, o `{ kind: 'background', jobId }` con `background: true`.
+- Comando `/score` — puntuación por lotes de una lista separada por espacios/comas como trabajo en segundo plano `score-batch` sobre `ctx.jobs`, produciendo una tabla (JSON + Markdown).
+- Herramienta `score_report` — recupera una tarjeta (`sc_...`), una tabla (`lb_...`) o la última tabla.
+- **Cinco dimensiones** (pesos configurables, suma 100 por defecto): instalación `25`, mantenimiento `20`, documentación `20`, seguridad `20`, cumplimiento `15`.
+- **Disciplina de evidencia** — cada dimensión registra sus enlaces de auditoría; sin evidencia reporta `no-evidence` (puntuación 0, excluida del total), nunca un número inventado.
+- Resultados estructurados — cada registro lleva `schema: "dsh-score/v1"`.
+
+## Inicio rápido
+
+### Canal git
+
+```sh
+dsh plugin --profile web add github:PerryLink/dsh-score#<commit-sha>
+```
+
+El primer `add` falla porque pnpm bloquea el `prepare`; copia la clave exacta impresa en `pnpm-workspace.yaml` y reintenta:
+
+```yaml
+allowBuilds:
+  'dsh-score': true
+```
+
+### Canal npm
+
+```sh
+dsh plugin --profile web add dsh-score
+```
+
+## Instalación y desinstalación
+
+```sh
+dsh plugin --profile web add dsh-score     # instalar (npm) — o el formulario git anterior
+dsh plugin --profile web remove dsh-score  # desinstalar
+```
+
+## Configuración
+
+Todas las claves son opcionales (valores por defecto mostrados); los valores inválidos fallan en voz alta al cargar.
+
+| Clave | Predeterminado | Descripción |
+|---|---|---|
+| `probeTimeoutMs` | `60000` | Plazo para un comando de sondeo `gh`/`npm`. |
+| `outputTailBytes` | `8000` | Tope de la cola de salida saneada por sondeo. |
+| `cacheMaxAgeMs` | `86400000` | Tiempo de reutilización de una tarjeta cacheada. |
+| `staleCommitWarnDays` | `90` | Edad de commit a `warn`. |
+| `staleCommitFailDays` | `365` | Edad de commit a `fail`. |
+| `staleIssueWarnDays` | `30` | Edad de issue abierto más antiguo a `warn`. |
+| `staleIssueFailDays` | `180` | Edad de issue abierto más antiguo a `fail`. |
+| `maxBatchTargets` | `20` | Tope de lote de `/score`. |
+| `batchConcurrency` | `1` | Concurrencia del lote. |
+| `weights` | `{install:25, maintenance:20, documentation:20, security:20, compliance:15}` | Pesos por dimensión. |
+
+## Herramientas y superficies
+
+### `score`
+
+```
+score(target: string, refresh?: boolean, background?: boolean)
+```
+
+- `target` — repositorio de GitHub (`github:owner/repo`, `owner/repo`, URL git/https) o nombre de paquete npm.
+- `refresh: true` omite la caché y vuelve a recopilar evidencia.
+- `background: true` inicia un trabajo `score-batch`.
+
+### `/score <targets...>`
+
+Inicia un trabajo por lotes en segundo plano; la última línea nombra el id de tabla para `score_report`.
+
+### `score_report(id?)`
+
+Devuelve una tarjeta (`sc_...`), una tabla (`lb_...`) o, sin id, la última tabla.
+
+### `score_badge(target? | id?, refresh?)`
+
+Genera una insignia embebible en README y el JSON de cinco dimensiones para un objetivo:
+
+- `target` — puntúa un repositorio de GitHub o un paquete npm (a través de la caché) y le pone insignia; mutuamente excluyente con `id`.
+- `id` — pone insignia a una tarjeta almacenada (`sc_...`) sin volver a puntuar.
+- `refresh: true` — omite la caché de puntuación (solo aplica a `target`).
+
+Devuelve la insignia (SVG + endpoint + inserción Markdown) y el JSON compacto de cinco dimensiones — ver «Insignia y API JSON» abajo.
+
+### Structured result sample
+
+```json
+{
+  "schema": "dsh-score/v1",
+  "scoreId": "sc_8f1c2e4a9b3d7f01",
+  "target": { "kind": "repo", "spec": "github:owner/dsh-click#abc123" },
+  "scoredAt": "2026-08-16T00:00:00.000Z",
+  "durationMs": 3210,
+  "pluginVersion": "0.1.0",
+  "dimensions": {
+    "install": { "dimension": "install", "status": "no-evidence", "score": 0, "weight": 25,
+                 "summary": "no dsh-test-drive result recorded for this target (install success unmeasured)",
+                 "evidence": [{ "source": "test-drive", "detail": "no test-drive record found in the test_drive domain", "observedAt": "2026-08-16T00:00:00.000Z" }] },
+    "maintenance": { "dimension": "maintenance", "status": "pass", "score": 100, "weight": 20,
+                     "summary": "active (2026-08-10T00:00:00Z; 0 open issues)",
+                     "evidence": [{ "source": "gh-api", "detail": "last activity 2026-08-10T00:00:00Z", "observedAt": "2026-08-16T00:00:00.000Z" }] }
+  },
+  "total": 88,
+  "grade": "B",
+  "verdict": "healthy (weighted total 88/100)"
+}
+```
+
+Puntuación: el total es una media ponderada sobre las dimensiones con evidencia (las dimensiones no-evidence se excluyen y se renormalizan); `A` ≥ 90, `B` ≥ 75, `C` ≥ 60, `D` ≥ 40, si no `F`, y `N/A` cuando nada tuvo evidencia.
+
+## Insignia y API JSON
+
+`score_badge` genera una insignia embebible en README y el JSON de cinco dimensiones para un objetivo puntuado.
+
+### Insignia
+
+- **Insignia** — SVG plano de shields.io (campo `badge.svg` / `renderScoreBadge`), URL de endpoint documentada y fragmento Markdown de inserción.
+
+Inserta la insignia total:
+
+```markdown
+![dsh-score: B · 84/100](https://img.shields.io/badge/dsh--score-B_%C2%B7_84%2F100-green)
+```
+
+### JSON de cinco dimensiones
+
+- **JSON de cinco dimensiones** — `install`/`maintenance`/`documentation`/`security`/`compliance` con `status`/`score`/`weight`/`summary`, más el `total` ponderado y la `grade` (`schema: "dsh-score/badge/v1"`).
+
+Una dimensión `no-evidence` conserva su estado honesto y puntúa 0 — la insignia y el JSON nunca inventan números.
+
+## Permisos y datos
+
+- Solo servicios públicos: `ctx.subprocess`, `ctx.jobs`, `ctx.storageDomain`, `ctx.tools`, `ctx.commands`.
+- Las tarjetas y tablas se almacenan en el dominio `score` (tablas `scores`, `leaderboards`; puntero a la última tabla). Sin `storageDomain`, las herramientas siguen funcionando y la persistencia se desactiva con motivo registrado. El bundle `dsh-base` publicado monta storage-domain desde `0.1.2-rc.1` (verificado con los tarballs `0.1.2-rc.1` y `0.1.5-alpha.1`), así que la persistencia está activa en la línea publicada.
+- Los procesos hijos heredan un entorno sin credenciales; `gh` usa su propio almacén. Ningún valor de entorno se registra.
+
+## Límites de seguridad
+
+- **Sin ejecución de código.** Solo se ejecutan `gh api` y `npm view`.
+- **Subprocesos solo argv.** Nunca se interpreta una shell; los segmentos owner/repo se validan antes de usarse.
+- **Disciplina de evidencia.** Un sondeo fallido produce `no-evidence`, nunca un número.
+- **Detección vs saneado.** Detección de secretos y scripts maliciosos comparte las mismas regex puras que el saneado.
+
+## Limitaciones conocidas
+
+- Los sondeos de repositorio requieren `gh` autenticado y red; los de npm requieren `npm` y acceso al registry.
+- Sin un repositorio de GitHub resoluble, documentación/seguridad/cumplimiento reportan `no-evidence`.
+- El éxito de instalación depende de `dsh-test-drive` montado con el objetivo registrado.
+- La «respuesta a issues» es un proxy (edad del issue abierto más antiguo).
+- Los resultados se cachean por objetivo; usa `refresh: true` para forzar re-puntuación.
+
+## Desarrollo
+
+```sh
+pnpm install
+pnpm run typecheck && pnpm run typecheck:ci && pnpm test
+pnpm run build && pnpm run verify:self-contained && pnpm run verify:artifacts && pnpm pack
+```
+
+## Temas
+
+`dsh`, `dsh-plugin`, `deepseek-harness`, `deepseek`, `cordis`, `plugin-scoring`, `quality-score`, `leaderboard`, `supply-chain`
+
+## Contribuidores
+
+[PerryLink](https://github.com/PerryLink) — diseño e implementación.
+
+## PerryLink DSH Plugin Family
+
+Este proyecto es uno de los [40 complementos de DeepSeek Harness](https://github.com/PerryLink) mantenidos por [PerryLink](https://github.com/PerryLink). Si este te ayuda, probablemente los demás también:
+
+| Plugin | One-liner |
+|---|---|
+| **[dsh-auto-review](https://github.com/PerryLink/dsh-auto-review)** | Auto-revisión de segundo modelo en la cadena de aprobación, con cierre en fallo por defecto | |
+| **[dsh-background-agents](https://github.com/PerryLink/dsh-background-agents)** | Agentes hijos en segundo plano durables con barra lateral de UI web, mensajería e interrupción | |
+| **[dsh-budget](https://github.com/PerryLink/dsh-budget)** | Gobernanza de costes para DeepSeek Harness: presupuestos, carbono y latencia en un panel. | |
+| **[dsh-checkpoint-rewind](https://github.com/PerryLink/dsh-checkpoint-rewind)** | Equivalente a /rewind de Claude Code: instantáneas, bifurcaciones de sesión, restauración de un solo uso | |
+| **[dsh-claude-move](https://github.com/PerryLink/dsh-claude-move)** | Migra sesiones, memoria, habilidades y CLAUDE.md de Claude Code a DSH | |
+| **[dsh-click](https://github.com/PerryLink/dsh-click)** | Control de escritorio nativo multiplataforma para DeepSeek Harness — Windows primero. | |
+| **[dsh-composer-history](https://github.com/PerryLink/dsh-composer-history)** | Historial de entrada estilo terminal para el compositor web: flechas, búsqueda Ctrl+R | |
+| **[dsh-data-quality](https://github.com/PerryLink/dsh-data-quality)** | Comprobaciones de calidad de datasets y verificación de citas (el puente numérico opcional consumido aquí) | |
+| **[dsh-defend](https://github.com/PerryLink/dsh-defend)** | Defensa contra inyección de prompts, jailbreak y fuga de secretos para DeepSeek Harness. | |
+| **[dsh-doublecheck](https://github.com/PerryLink/dsh-doublecheck)** | Guardián de disciplina de ingeniería: interrogatorio de requisitos, puertas de pruebas, revisión adversaria | |
+| **[dsh-draw](https://github.com/PerryLink/dsh-draw)** | Enrutamiento unificado de generación de imágenes estáticas para DeepSeek Harness. | |
+| **[dsh-fast](https://github.com/PerryLink/dsh-fast)** | Diagnóstico de rendimiento de solo lectura para DeepSeek Harness. | |
+| **[dsh-fund-research](https://github.com/PerryLink/dsh-fund-research)** | Informes de investigación deterministas para fondos mutuos públicos chinos | |
+| **[dsh-github](https://github.com/PerryLink/dsh-github)** | Integración de PR/issues de GitHub para DSH, cada escritura controlada por aprobación | |
+| **[dsh-industry-research](https://github.com/PerryLink/dsh-industry-research)** | Orquestación de investigación sectorial que sella sus entregables mediante el `ctx.researchReport.assemble` de este plugin | |
+| **[dsh-library](https://github.com/PerryLink/dsh-library)** | Base de conocimiento documental local para DeepSeek Harness. | |
+| **[dsh-local-ai](https://github.com/PerryLink/dsh-local-ai)** | Integración de modelos locales (Ollama) para DeepSeek Harness. | |
+| **[dsh-lsp-actions](https://github.com/PerryLink/dsh-lsp-actions)** | Diagnósticos, formato, autocompletado, acciones de código y renombrado LSP sobre servidores de lenguaje | |
+| **[dsh-mask](https://github.com/PerryLink/dsh-mask)** | Middleware de enmascaramiento de PII: anonimiza en el límite del modelo, restaura en la capa de visualización | |
+| **[dsh-mcp-panel](https://github.com/PerryLink/dsh-mcp-panel)** | Panel de tiempo de ejecución MCP de solo lectura: comando /mcp + pestaña Settings con estado, herramientas y errores | |
+| **[dsh-memento](https://github.com/PerryLink/dsh-memento)** | Memoria entre sesiones controlada por aprobación: costura ctx.memory + SQLite + herramienta de memoria | |
+| **[dsh-observe](https://github.com/PerryLink/dsh-observe)** | Exportador de observabilidad OpenTelemetry y Langfuse para DeepSeek Harness. | |
+| **[dsh-output-styles](https://github.com/PerryLink/dsh-output-styles)** | Cambio de estilo en tiempo de ejecución equivalente a outputStyles de Claude Code | |
+| **[dsh-permission-rules](https://github.com/PerryLink/dsh-permission-rules)** | Reglas de permisos declarativas allow/deny/ask estilo Claude Code con auditoría | |
+| **[dsh-personal-directive](https://github.com/PerryLink/dsh-personal-directive)** | Inyector de directivas personales con interruptor en la barra superior (edición framework) |
+| **[dsh-plugin-guide](https://github.com/PerryLink/dsh-plugin-guide)** | Base de conocimiento de desarrollo de plugins como habilidad de agente bajo demanda | |
+| **[dsh-plugin-doctor](https://github.com/PerryLink/dsh-plugin-doctor)** | Zero-dependency static + sandbox smoke detector for DSH plugins | |
+| **[dsh-reach](https://github.com/PerryLink/dsh-reach)** | Puente multicanal de aprobación/preguntas: WeChat/Telegram/Feishu, consola de sesión |
+| **[dsh-research-report](https://github.com/PerryLink/dsh-research-report)** | Motor de informes de investigación verificables con evidencia direccionada por contenido | |
+| **[dsh-session-pin](https://github.com/PerryLink/dsh-session-pin)** | Fija sesiones en la barra lateral web con orden durable | |
+| **[dsh-session-sync](https://github.com/PerryLink/dsh-session-sync)** | Sincronización de sesiones entre dispositivos para DeepSeek Harness — un espejo git dedicado de tu almacén de sesiones. | |
+| **[dsh-skill-pack-security](https://github.com/PerryLink/dsh-skill-pack-security)** | Paquete de habilidades de auditoría de seguridad: escaneo de secretos, revisión de dependencias y cadena de suministro | |
+| **[dsh-talk](https://github.com/PerryLink/dsh-talk)** | Bucle de sesión con voz para DeepSeek Harness: háblale y escucha su respuesta. | |
+| **[dsh-test-drive](https://github.com/PerryLink/dsh-test-drive)** | Pruebas de instalación y humo aisladas para plugins de DeepSeek Harness. | |
+| **[dsh-ticktick](https://github.com/PerryLink/dsh-ticktick)** | Puente de tareas TickTick/Dida365: panel de cabecera de sesión + 11 herramientas |
+| **[dsh-translate](https://github.com/PerryLink/dsh-translate)** | Traducción de parámetros entre proveedores y reparación determinista de JSON para DeepSeek Harness. | |
+| **[dsh-wechat](https://github.com/pan17/dsh-wechat)** | Puente WeChat ↔ DSH (bot Tencent iLink): texto/imagen/archivo/voz, aprobaciones en el chat |
+| **[dsh-autotier](https://github.com/PerryLink/dsh-autotier)** | Automatic strong/cheap model-tier routing with deterministic risk guards and a `/tier` command | |
+| **[dsh-catalog](https://github.com/PerryLink/dsh-catalog)** | DSH Desktop Market standard catalog source for the PerryLink family | |
+| **[dsh-cert-mcp](https://github.com/PerryLink/dsh-cert-mcp)** | Read-only MCP server exposing the certification registry: grades, snapshots and five-dimension evidence | |
+| **[dsh-kit](https://github.com/PerryLink/dsh-kit)** | One-command starter pack that installs the core family | |
+| **[dsh-plugin-certification](https://github.com/PerryLink/dsh-plugin-certification)** | Community certification registry with repro-checkable grades and badges | |
+| **[dsh-plugin-kit](https://github.com/PerryLink/dsh-plugin-kit)** | Shared zero-runtime-dependency toolkit for the PerryLink DSH plugins | |
+| **[dsh-plugin-portal](https://github.com/PerryLink/dsh-plugin-portal)** | Zero-dependency static portal rendering the whole plugin family as one page | |
+| **[dsh-plugin-upgrade-015](https://github.com/PerryLink/dsh-plugin-upgrade-015)** | Merged `0.1.3-alpha.1` → `0.1.5-rc.1` upgrade corridor card plus a zero-dependency seam scanner | |
+| **[dsh-team-rooms](https://github.com/PerryLink/dsh-team-rooms)** | Cross-session team rooms: shared message bus, task board and timeline | |
+
+### Instalar desde el mercado de DSH Desktop
+
+Todos los plugins de PerryLink pueden explorarse en el mercado integrado de DSH Desktop: **Market → Sources → add source → pegar** `https://perrylink-dsh-catalog.perrylink.workers.dev/catalog-source.json` **→ seleccionarlo**. La instalación sigue pasando por la verificación de identidad npm del mercado y tu confirmación.
+
+## Licencia
+
+[Apache-2.0](LICENSE)

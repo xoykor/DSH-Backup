@@ -1,0 +1,43 @@
+# Patch layer for `dsh-output-styles`, declared by the package's
+# `dsh.bundle.patch` manifest and also usable by hand with `--patch`.
+#
+# The shipped profiles (web/headless/sdk/acp) compose the storage stack via
+# dsh-base, so this patch mounts only the plugin row. On the published
+# rc.1 loader, inserting a row whose id already exists is a fatal boot
+# error (`duplicate loader entry id`), not a same-id replace. A bare
+# profile without dsh-base must compose the storage stack itself.
+#
+# The plugin injects `storageDomain`; a bare profile has none of the
+# storage rows, so it must bring the routed kv backend along, including
+# the config the rc.6 schemas require (root for storage-json, backend for
+# storage-domain) — without it the rows fail their config validation.
+- insert:
+    - id: output-styles
+      name: 'dsh-output-styles'
+      # config:                     # schema defaults shown for reference
+      #   stylesDir: []             # [] = bundled styles/ only (lowest priority)
+      #   maxStyleChars: 4000
+      #   defaultStyle: ''          # '' = new sessions get no style
+      #   compatJson: true
+      #   sectionOrder: 90
+      #   truncationMarker: "\n\n[style truncated]"
+      #   includeBuiltins: true
+      #   watchStyles: true
+      #   rules: []                  # per-session/per-tool render rules
+      #                              # [{ match: { tool?, contentType?, session? }, style, priority? }]
+      #   enableExport: true         # register the /export command
+      #                              # (md|html; --save <path> writes the
+      #                              # sanitized document after approval)
+
+    # Optional invariant companion (envelope-level checks). Only for profiles
+    # that DISABLE the main row above: the main plugin already registers
+    # library-aware checks when an `invariants` service is composed, and the
+    # host registry accepts one registrant per package name.
+    # - id: output-styles-invariant
+    #   name: 'dsh-output-styles/invariant'
+
+    # Optional Web picker (browser half). Only for web profiles whose client
+    # bundle composes the client runtime services; headless profiles must not
+    # enable this row.
+    # - id: output-styles-client
+    #   name: 'dsh-output-styles/client'

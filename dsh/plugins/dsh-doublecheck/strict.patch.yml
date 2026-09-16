@@ -1,0 +1,75 @@
+# dsh-doublecheck strict overlay: every discipline gate ON at `block` intensity.
+#
+# Apply this patch AFTER the bundle patch (later layers win by position), e.g.:
+#   dsh --profile <name> --patch ./strict.patch.yml
+# A patch replaces the row's WHOLE config — Schema defaults are NOT re-applied
+# on override — so every key the guard row needs is restated here. The grill
+# row keeps its defaults and is not restated.
+- id: doublecheck-guard
+  config:
+    intensity: block
+    modules:
+      grill: true
+      tdd: true
+      adversary: true
+    adversaryModel: null
+    adversaryProvider: fork
+    adversaryMaxFindings: 5
+    adversaryTools: ['read', 'glob', 'grep']
+    adversaryTimeoutMs: 120000
+    guardTools: ['edit', 'write']
+    vagueTaskMaxChars: 200
+    remindOnce: true
+    language: en
+    enableByDefault: true
+    testToolNames: ['bash', 'pwsh']
+    testCommandPatterns:
+      - '(?:^|[;&|]\s*)(?:(?:pnpm|npm|npx|yarn|bun)(?:\s+run)?\s+(?:test|vitest|jest|mocha)(?:\s|$))'
+      - '(?:^|[;&|]\s*)(?:(?:pytest|go\s+test|cargo\s+test|make\s+test|ctest)(?:\s|$))'
+      - '(?:^|[;&|]\s*)(?:node\s+--test(?:\s|$))'
+      - '(?:^|[;&|]\s*)(?:deno\s+test|uv\s+run\s+pytest)(?:\s|$)'
+    testFilePatterns:
+      - '(^|[\\/])(tests?|__tests__|specs?)([\\/]|$)'
+      - '\\.(test|spec)\\.[A-Za-z0-9]+$'
+    gate:
+      enabled: true
+      planSuggestion: true
+      reportFile: 'gate-report.md'
+      requirements:
+        enabled: true
+        checklist:
+          - { id: goal, question: 'What outcome must the delivery produce?', specDimension: goal, required: true }
+          - { id: scope, question: 'What is in scope, and what is out of scope?', specDimension: scope, required: true }
+          - { id: acceptance, question: 'Which observable checks prove the work is done?', specDimension: acceptanceCriteria, required: true }
+          - { id: failureModes, question: 'What can go wrong, and what is the correct behavior in each case?', specDimension: failureModes, required: true }
+          - { id: priorities, question: 'What is traded when goals conflict; what is optional?', specDimension: priorities, required: true }
+          - { id: nonGoals, question: 'What does the user explicitly not want?', specDimension: nonGoals, required: true }
+        minConfirmed: 6
+        interrogateTool: 'ask_user_question'
+      tests:
+        enabled: true
+        requirePassingRun: true
+        allowFailingRuns: 0
+        requireCoverage: true
+        minCoveragePct: 80
+        coveragePattern: 'coverage[^\\d]{0,40}(\\d+(?:\\.\\d+)?)\\s*%'
+        evalReports:
+          enabled: false
+          dir: '.eval-reports'
+          file: 'report.json'
+          required: false
+      consistency:
+        enabled: true
+        provider: fork
+        model: null
+        tools: ['read', 'glob', 'grep']
+        timeoutMs: 120000
+        maxFindings: 5
+      review:
+        enabled: true
+        engine: auto
+        provider: fork
+        model: null
+        tools: ['read', 'glob', 'grep']
+        timeoutMs: 120000
+        maxFindings: 5

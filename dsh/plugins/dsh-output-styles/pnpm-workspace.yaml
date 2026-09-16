@@ -1,0 +1,15 @@
+packages:
+  - .
+
+autoInstallPeers: false
+
+allowBuilds:
+  esbuild: true
+  # Native addon used only by the Windows move path of the jsonl persistence
+  # backend; tests never exercise it, so its install script stays denied.
+  koffi: false
+
+minimumReleaseAgeExclude:
+  - '@deepseek-ai/*'
+
+verifyDepsBeforeRun: false

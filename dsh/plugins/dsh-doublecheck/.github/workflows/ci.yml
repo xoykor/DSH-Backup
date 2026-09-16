@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+jobs:
+  gates:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: ['22', '24']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # The packageManager field in package.json pins the exact pnpm version,
+      # so CI and local development resolve the same toolchain.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Test
+        run: pnpm run test
+
+      - name: Skill-pack layout verification
+        run: pnpm run verify:skills
+
+      - name: Coverage
+        run: pnpm run test:coverage
+
+      - name: README sync (five languages)
+        run: pnpm run check:readmes
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Verify self-contained dependency specs
+        run: pnpm run verify:self-contained
+
+      - name: Verify built artifacts
+        run: pnpm run verify:artifacts
+
+      - name: Pack smoke
+        run: pnpm run pack:check
+
+      - name: Built artifacts are fresh
+        run: git diff --exit-code lib
+
+  # Assemble the published bundle into a real DSH profile and prove both
+  # plugin rows mount: the only step that exercises cordis.patch.yml.
+  # Both release lines are probed: the published dependency-pin line and the
+  # current V3 line (whose `tool/ptc-dispatch` vocabulary the plugin adapts to).
+  smoke:
+    needs: gates
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dsh: ['0.1.2-rc.1', '0.1.5-alpha.1']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Pack
+        run: pnpm pack
+
+      - name: Install the DSH CLI
+        run: npm install --global @deepseek-ai/dsh@${{ matrix.dsh }}
+
+      - name: Assemble a scratch profile with the packed bundle
+        run: |
+          dsh plugin --profile ci add ./dsh-doublecheck-*.tgz
+          dsh --profile ci --dump-config > dump.txt
+
+      - name: Assert the bundle rows mounted
+        run: node scripts/assert-profile.mjs dump.txt

@@ -117,3 +117,74 @@
       name: __DSH_HOME__/plugins/dsh-tool-browser/index.mjs
       config:
         baseURL: http://127.0.0.1:8731
+
+    # dsh-plugin-guide: on-demand skill (plugin-dev toolkit knowledge base).
+    - id: dsh-plugin-guide
+      name: __DSH_HOME__/plugins/dsh-plugin-guide/index.js
+
+    # dsh-test-drive v0.3.12: install/smoke test drive tool (/testdrive, drive_report).
+    - id: test-drive
+      name: __DSH_HOME__/plugins/dsh-test-drive/lib/index.js
+
+    # dsh-score v0.2.11: multi-dimensional plugin quality scorer (/score, score_batch).
+    - id: score
+      name: __DSH_HOME__/plugins/dsh-score/lib/index.js
+
+    # dsh-fast v0.2.12: read-only perf diagnostics (/fast, fast_report). Built from
+    # src via tsdown; entry point loads with runtime @deepseek-ai/* deps resolved
+    # from the shared runtime store (import smoke rc=0). Read-only; all tunables
+    # default on. No service-id collision with context-guard.
+    - id: dsh-fast
+      name: __DSH_HOME__/plugins/dsh-fast/lib/index.js
+
+    # dsh-budget v0.4.9: cost governance (/budget, Settings budget tab). Built via
+    # tsdown; entry loads with runtime deps (import smoke rc=0). inject:[sessions].
+    - id: dsh-budget
+      name: __DSH_HOME__/plugins/dsh-budget/lib/index.js
+
+    # dsh-output-styles v0.6.16: runtime output-style switch (/style, per-session).
+    # Built from src via tsdown (fixed shipped config whose entries pointed at the
+    # lib/ output paths); entry loads with @deepseek-ai/* deps resolved from the
+    # shared runtime store (import smoke rc=0). inject:[systemPrompt, storageDomain].
+    # System-prompt injection only; no service-id collision with context-guard.
+    - id: output-styles
+      name: __DSH_HOME__/plugins/dsh-output-styles/lib/index.js
+
+    # dsh-translate v0.2.10: LLM translation (/translate, fix.mjs repair). Ships
+    # prebuilt .mjs (main ./index.mjs); no build step. Prebuilt entry loads with
+    # runtime @deepseek-ai/* deps resolved from the shared runtime store
+    # (import smoke rc=0). inject:[commands, tools] — tool-only, no systemPrompt
+    # injection; no service-id collision with context-guard.
+    - id: dsh-translate
+      name: __DSH_HOME__/plugins/dsh-translate/index.mjs
+
+    # dsh-library v0.2.11: RAG library store (/library). Built from src via tsdown
+    # (run from the plugin dir so its relative src/index.ts entry resolves; absolute
+    # bin path fails with "No input files"). lib/index.js 255.56kB, zod inlined per
+    # config. Import smoke LOADED_OK inject:[storageDomain, tools, commands] keys=60.
+    # Host-only (no client bundle); storageDomain provided by the host stack. No
+    # service-id collision with context-guard.
+    - id: dsh-library
+
+    # dsh-memento v0.5.12: frozen memory snapshot + recall tools (memory seam).
+    # Prebuilt bundle (main ./index.mjs); no build step. Ships NO local node_modules;
+    # 4 runtime @deepseek-ai/* imports (dsh-tools, schemastery, dsh-session,
+    # dsh-settings) symlinked into a plugin-local node_modules so bare resolution
+    # works like the other plugins (deps confirmed present in shared store). Import
+    # smoke LOADED_OK inject:[tools, systemPrompt, approval]. Declares systemPrompt
+    # injection but references no service-id collision with context-guard. No
+    # dsh-auto-review / dsh-background-agents; host-only (no client bundle).
+    - id: memento
+      name: __DSH_HOME__/plugins/dsh-memento/index.mjs
+
+    # dsh-checkpoint-rewind v0.6.11: checkpoint/rewind seam (/checkpoint, /rewind).
+    # Prebuilt bundle (main ./index.mjs); no build step. Ships NO local node_modules;
+    # 241 @deepseek-ai/* + top-level zod symlinked into a plugin-local node_modules
+    # (@deepseek-ai -> shared store dir; zod from shared-store root). Import smoke
+    # LOADED_OK inject:["sessions","commands"] (export const inject); runtime also
+    # ctx.inject settings/sessionProjections/systemPrompt/tools. Manifest uses the
+    # package-name form (name: dsh-checkpoint-rewind) but convention is bare-path, so
+    # mounted via index.mjs. No reference to context-guard / auto-review /
+    # background-agents -> safe bare mount. host-only (no client bundle).
+    - id: checkpoint-rewind
+      name: __DSH_HOME__/plugins/dsh-checkpoint-rewind/index.mjs

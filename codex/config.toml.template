@@ -1,5 +1,5 @@
 model = "gpt-5.6-luna"
-model_reasoning_effort = "high"
+model_reasoning_effort = "xhigh"
 service_tier = "default"
 [projects."__HOME__"]
 trust_level = "trusted"
@@ -152,6 +152,36 @@ trust_level = "trusted"
 trust_level = "trusted"
 
 [projects."__HOME__/Documents/Codex/2026-09-14/https-github-com-xoykor-avalia-o"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-14/c"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-14/me-x20"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-14/o-x20"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-14/github-com-xoykor-mana-ponte"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documentos/Estudo/Downloader"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-15/s"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documentos/Estudo/Kontainer Cachy"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-16/https-github-com-waywallen-waywallen-https"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-16/so"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-16/q"]
 trust_level = "trusted"
 
 [desktop]

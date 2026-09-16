@@ -1,0 +1,148 @@
+/**
+ * The `doublecheck` session projection: the discipline facts a client renders
+ * (Web UI status row), folded from the durable session log alone.
+ *
+ * The state is plain JSON (the persisted-cache precondition of the projection
+ * registry) and mirrors the guard's own fold: a successful `doublecheck_spec`
+ * pair commits the spec goal, test runs move the color, implementation edits
+ * bump the edit count, and a `doublecheck-review` source record marks the
+ * delivery reviewed. Resumed and forked sessions fold to the same view.
+ *
+ * @module dsh-doublecheck/domain/projection
+ */
+import { isTestCommand, isTestFilePath, joinTextBlocks, mutationTargetPath, parseRawArguments, ptcSettle, shellCommand, testOutcome, } from "./evidence.js";
+import { SPEC_TOOL_NAME } from "./stages.js";
+import { countRedChecks } from "./gate.js";
+/** State for the empty log. */
+export function emptyDoublecheckState() {
+    return {
+        stage: 'grill',
+        color: 'none',
+        hasSpec: false,
+        specGoal: '',
+        reviewed: false,
+        editCount: 0,
+        gateVerdict: 'none',
+        gateRedCount: 0,
+        pendingSpecCalls: {},
+        pendingTestCalls: {},
+    };
+}
+/**
+ * One-event transition of the `doublecheck` projection unit. Uninterested
+ * events return the same state reference (the registry's change gate).
+ * @param state - the folded state before `event`.
+ * @param event - one committed session event.
+ * @param detection - the compiled red/green evidence knobs.
+ * @returns the next state; the same reference when the event is not a
+ *   discipline fact.
+ */
+export function applyDoublecheckEvent(state, event, detection) {
+    // A settled PTC sub-dispatch is a discipline fact exactly like a native
+    // call. The normalizer accepts both event generations, so the projection
+    // does not depend on which one wrote the log.
+    const settle = ptcSettle(event);
+    if (settle !== undefined) {
+        const args = parseRawArguments(settle.arguments);
+        const command = shellCommand(settle.name, args, detection);
+        if (command !== undefined && isTestCommand(command, detection)) {
+            const outcome = testOutcome(joinTextBlocks(settle.content), settle.isError);
+            if (outcome === 'fail')
+                return { ...state, color: 'red', stage: 'red' };
+            if (outcome === 'pass')
+                return { ...state, color: 'green', stage: 'green' };
+        }
+        return state;
+    }
+    switch (event.type) {
+        case 'tool/call': {
+            const args = parseRawArguments(event.data.arguments);
+            if (event.data.name === SPEC_TOOL_NAME) {
+                const goal = typeof args?.['goal'] === 'string' ? args['goal'] : '';
+                return { ...state, pendingSpecCalls: { ...state.pendingSpecCalls, [event.data.callId]: goal } };
+            }
+            const command = shellCommand(event.data.name, args, detection);
+            if (command !== undefined && isTestCommand(command, detection)) {
+                return { ...state, pendingTestCalls: { ...state.pendingTestCalls, [event.data.callId]: command } };
+            }
+            const path = mutationTargetPath(event.data.name, args, detection);
+            if (path !== undefined && !isTestFilePath(path, detection)) {
+                return { ...state, editCount: state.editCount + 1 };
+            }
+            return state;
+        }
+        case 'tool/result': {
+            const callId = event.data.message.source.callId;
+            if (event.data.error === undefined && callId in state.pendingSpecCalls) {
+                const pendingSpecCalls = { ...state.pendingSpecCalls };
+                const goal = pendingSpecCalls[callId] ?? '';
+                delete pendingSpecCalls[callId];
+                return {
+                    ...state,
+                    pendingSpecCalls,
+                    hasSpec: true,
+                    specGoal: goal,
+                    stage: 'design',
+                };
+            }
+            if (callId in state.pendingTestCalls) {
+                const pendingTestCalls = { ...state.pendingTestCalls };
+                delete pendingTestCalls[callId];
+                const outcome = testOutcome(joinTextBlocks(event.data.message.content), event.data.error !== undefined);
+                const next = { ...state, pendingTestCalls };
+                if (outcome === 'fail')
+                    return { ...next, color: 'red', stage: 'red' };
+                if (outcome === 'pass')
+                    return { ...next, color: 'green', stage: 'green' };
+                return next;
+            }
+            return state;
+        }
+        case 'user/message': {
+            const source = event.data.source;
+            if (source.kind === 'doublecheck-review' && !state.reviewed) {
+                return { ...state, reviewed: true };
+            }
+            return state;
+        }
+        case 'doublecheck/gate': {
+            const gate = event.data;
+            const redCount = countRedChecks(Object.values(gate.phases));
+            if (state.gateVerdict === gate.verdict && state.gateRedCount === redCount)
+                return state;
+            return { ...state, gateVerdict: gate.verdict, gateRedCount: redCount };
+        }
+        default:
+            return state;
+    }
+}
+/**
+ * Fold a session log from scratch to the projection state.
+ * @param events - the session's append-only event log.
+ * @param detection - the compiled red/green evidence knobs.
+ * @returns the complete folded state.
+ */
+export function foldDoublecheckState(events, detection) {
+    let state = emptyDoublecheckState();
+    for (const event of events) {
+        state = applyDoublecheckEvent(state, event, detection);
+    }
+    return state;
+}
+/**
+ * Project the folded state to the wire payload.
+ * @param state - the folded state.
+ * @returns the whole current value for the `doublecheck` projection key.
+ */
+export function viewDoublecheck(state) {
+    return {
+        stage: state.stage,
+        color: state.color,
+        hasSpec: state.hasSpec,
+        specGoal: state.specGoal,
+        reviewed: state.reviewed,
+        editCount: state.editCount,
+        gateVerdict: state.gateVerdict,
+        gateRedCount: state.gateRedCount,
+    };
+}

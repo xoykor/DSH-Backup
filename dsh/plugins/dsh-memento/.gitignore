@@ -1,0 +1,7 @@
+node_modules/
+dev/
+*.tgz
+*.db
+*.db-wal
+*.db-shm
+dev-*.txt

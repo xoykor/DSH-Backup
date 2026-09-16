@@ -1,0 +1,58 @@
+import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+
+const root = dirname(dirname(fileURLToPath(import.meta.url)))
+const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+const patch = readFileSync(join(root, 'cordis.patch.yml'), 'utf8')
+
+/**
+ * Row `name:` keys sit at the six-space indent directly under each `- id:`
+ * list item of the bundle patch (config keys under `config:` nest deeper).
+ */
+function rowNames(patchText: string): string[] {
+  const names: string[] = []
+  for (const line of patchText.split('\n')) {
+    const match = /^ {6}name:\s*(?:'([^']+)'|"([^"]+)"|(\S+))\s*$/.exec(line)
+    if (match) names.push(match[1] ?? match[2] ?? match[3] ?? '')
+  }
+  return names
+}
+
+describe('cordis.patch.yml manifest consistency', () => {
+  it('every external row name is declared in dependencies or peerDependencies', () => {
+    const declared = new Set([
+      ...Object.keys(pkg.dependencies ?? {}),
+      ...Object.keys(pkg.peerDependencies ?? {}),
+    ])
+    for (const name of rowNames(patch)) {
+      const own = name === pkg.name || name.startsWith(`${pkg.name}/`)
+      expect(own || declared.has(name), `patch row "${name}" must be declared`).toBe(true)
+    }
+  })
+
+  it('mounts only the plugin row: shipped profiles already compose the storage stack via dsh-base', () => {
+    const names = rowNames(patch)
+    expect(names).toEqual([pkg.name])
+    for (const storage of [
+      '@deepseek-ai/dsh-storage',
+      '@deepseek-ai/dsh-storage-json',
+      '@deepseek-ai/dsh-storage-domain',
+    ]) {
+      expect(names, `patch must not insert ${storage}`).not.toContain(storage)
+    }
+  })
+
+  it('declares a peer dependency for every hard-injected service provider', () => {
+    // src/index.ts injects storageDomain, tools, and commands; a hard inject
+    // must have its provider package in peerDependencies, not only dev.
+    for (const provider of [
+      '@deepseek-ai/dsh-storage-domain',
+      '@deepseek-ai/dsh-tools',
+      '@deepseek-ai/dsh-commands',
+    ]) {
+      expect(pkg.peerDependencies, `missing peer ${provider}`).toHaveProperty(provider)
+    }
+  })
+})

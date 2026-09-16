@@ -1,0 +1,57 @@
+ui-onboarding:
+  welcomeNoticeVersion: 2026-08-13.1
+agent-presets:
+  default: minimal
+llm-deepseek:
+  models:
+    - id: deepseek-v4-flash
+      name: DeepSeek-V4-Flash
+      contextWindow: 1000000
+    - id: deepseek-v4-pro
+      name: DeepSeek-V4-Pro
+      contextWindow: 1000000
+llm-pi-ai:
+  providers:
+    google:
+      apiKeyEnv: GOOGLE_API_KEY
+      api: openai-completions
+      baseURL: https://generativelanguage.googleapis.com/v1beta/openai/
+    lmstudio:
+      displayName: LM Studio
+      apiKeyEnv: LMSTUDIO_API_KEY
+      # LM Studio's Responses endpoint accepts the WebP data URLs emitted by
+      # DSH, while its Chat Completions wrapper rejects image/webp.
+      api: openai-responses
+      baseURL: http://127.0.0.1:1234/v1
+      # Raised to the model's own cap (ornith). The backend's real window is
+      # still controlled by LM Studio; this only sets DSH's assumed size.
+      defaultContextWindow: 131072
+      # Local reasoning can remain silent while the model is thinking; give
+      # the stream watchdog more time and leave room for the final answer.
+      timeoutMs: 900000
+      streamIdleTimeoutMs: 900000
+      models:
+        - id: ornith-1.5-9b
+          maxTokens: 24576
+          input:
+            - text
+            - image
+        - id: qwen3.8-27b-gsq-rco
+          name: Qwen 3.8 27B GSQ RCO
+          contextWindow: 64000
+          maxTokens: 12000
+          input: [ text, image ]
+          reasoningEfforts:
+            off: "none"
+            minimal: "minimal"
+            low: "low"
+            medium: "medium"
+            high: "high"
+            xhigh: "xhigh"
+            max: "xhigh"
+agent-default-model:
+  provider: lmstudio
+  model: qwen3.8-27b-gsq-rco
+  reasoningEffort: max
+permission:
+  defaultPreset: danger-full-access

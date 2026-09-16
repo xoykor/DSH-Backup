@@ -1,0 +1,75 @@
+name: release
+
+# 打 v* 标签即发布 npm：先全量门禁（测试/类型/覆盖率/五语 README），再 npm publish。
+# 需要仓库 secret：NPM_TOKEN（npm 自动化 token，类型 Automation 或 Publish）。
+# 幂等：标签版本已在 npm 上时跳过 publish——重推旧标签/补标签不会红。
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run check:coverage
+      - run: npm run check:readmes
+      - name: 跳过已发布版本
+        id: published
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if npm view "dsh-memento@${VERSION}" version >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "dsh-memento@${VERSION} 已在 npm 上，跳过发布"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.published.outputs.skip != 'true'
+        run: npm publish --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # npm publish alone left every release without a GitHub Release page (v0.5.11
+  # had to be created by hand after the fact). This job closes that gap and is
+  # idempotent, so re-running a tag is safe.
+  release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create the GitHub Release from the CHANGELOG
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            echo "release ${{ github.ref_name }} already exists; skipping"
+            exit 0
+          fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          # A CHANGELOG missing this version's section must not fail the job:
+          # npm has already published by now, and a missing Release page is
+          # exactly the gap this job exists to close. Fall back to generated
+          # notes instead of going red.
+          node scripts/changelog-section.mjs "$VERSION" > release-notes.md || true
+          if [ -s release-notes.md ]; then
+            gh release create "${{ github.ref_name }}" \
+              --title "${{ github.ref_name }}" \
+              --notes-file release-notes.md
+          else
+            gh release create "${{ github.ref_name }}" --generate-notes
+          fi

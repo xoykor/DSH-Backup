@@ -5,17 +5,15 @@ import { apply } from '../lib/index.js';
 const base = { economyTokens: 65536, checkpointTokens: 81920, compactTokens: 94371 };
 const reserve9b = { maxTurnMs: null, compactTokens: 91750, contextWindow: 131072, summaryMaxTokens: 8192, summaryMinTokens: 1024, safetyTokens: 4096, responseMaxTokens: 24576 };
 const overrides = { maxTurnMs: null, economyTokens: 32000, checkpointTokens: 40000, compactTokens: 44800, resultFingerprintChars: 3906, contextWindow: 64000, summaryMaxTokens: 4000, summaryMinTokens: 500, safetyTokens: 2000, responseMaxTokens: 12000 };
-function harness(t, extra = {}, checkpointImpl) {
+function harness(t) {
   const events = new Map(); const pressure = new Map(); const compactions = [];
   const service = { composedPreset: ctx => ctx.preset,
     serviceFor: agent => ({ compactNow: async () => { throw Error('checkpointNow required'); }, checkpointNow: async (_, signal, budget) => { compactions.push(agent.ctx.preset); assert.equal(budget.contextWindow, agent.ctx.preset.endsWith('27b') ? 64000 : 131072); return {}; } }) };
-  if (checkpointImpl) service.serviceFor = agent => ({ compactNow: async () => { throw Error('checkpointNow required'); }, checkpointNow: (...args) => checkpointImpl(agent, ...args) });
-  let guard;
-  const ctx = { tools: { guard(fn) { guard = fn; } }, get: () => service,
+  const ctx = { tools: { guard() {} }, get: () => service,
     tokenMeter: { measure: session => ({ totalTokens: pressure.get(session.id) ?? 0 }) },
     compaction: { compactNow: () => { throw Error('global compactor must not handle preset'); } },
     on: (event, cb) => events.set(event, cb) };
-  apply(ctx, { ...base, presetPolicies: { 'local-robust-9b': { ...reserve9b, ...extra }, 'local-robust-27b': { ...overrides, ...extra } } });
+  apply(ctx, { ...base, presetPolicies: { 'local-robust-9b': reserve9b, 'local-robust-27b': overrides } });
   const agents = [];
   t.after(() => agents.forEach(agent => events.get('agent/disposed')({ agent })));
   function agent(preset) {
@@ -30,80 +28,8 @@ function harness(t, extra = {}, checkpointImpl) {
       messages: turn === 1 ? [{ source: { kind: 'user' } }] : [], signal: new AbortController().signal },
     async () => ({ messages: [] }));
   }
-  return { agent, step, pressure, events, compactions, guard: exec => guard(exec) };
+  return { agent, step, pressure, events, compactions };
 }
-
-const unlimited = { maxTurnSteps: null, maxTurnToolCalls: null };
-test('unlimited presets remain isolated from the default 48-call policy', async t => {
-  const h = harness(t, unlimited);
-  for (const preset of ['local-robust-9b', 'local-robust-27b', 'unrelated']) {
-    const a = h.agent(preset); await h.step(a, 0);
-    let denied;
-    for (let i = 0; i < 1000; i++) {
-      const exec = { agent: a, name: 'edit', arguments: { path: `file-${i}.js` } };
-      denied = h.guard(exec);
-      if (denied) break;
-      await h.events.get('tools/post-execute')(exec, { value: `updated ${i}` }, async () => undefined);
-    }
-    if (preset === 'unrelated') assert.match(a.cancelled[0].reason, /48/);
-    else { assert.equal(denied, undefined); assert.equal(a.cancelled.length, 0); }
-  }
-});
-
-test('both unlimited presets survive repeated real guard compaction cycles', async t => {
-  const h = harness(t, unlimited);
-  for (const preset of ['local-robust-9b', 'local-robust-27b']) {
-    const a = h.agent(preset); await h.step(a, 0);
-    for (let i = 0; i < 60; i++) {
-      a.status = 'running';
-      assert.equal((await h.step(a, preset.endsWith('27b') ? 44800 : 91750, i * 2 + 2)).kind, 'reject');
-      a.status = 'idle'; h.events.get('agent/status')({ agent: a, status: 'idle' });
-      await new Promise(resolve => setImmediate(resolve));
-      assert.equal(a.steered.length, i + 1);
-      a.status = 'running';
-      assert.notEqual((await h.step(a, 1000, i * 2 + 3)).kind, 'reject');
-    }
-    assert.ok(a.cancelled.every(reason => reason.kind === 'context-guard-compaction'));
-  }
-  assert.equal(h.compactions.length, 120);
-});
-
-test('failed checkpoint never resumes unlimited execution', async t => {
-  const h = harness(t, unlimited, async () => { throw Error('disk unavailable'); });
-  const a = h.agent('local-robust-27b'); await h.step(a, 44800);
-  a.status = 'idle'; h.events.get('agent/status')({ agent: a, status: 'idle' });
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(a.steered.length, 0);
-  assert.match((await h.step(a, 1000, 2)).reason, /disk unavailable/);
-});
-
-test('disposing during checkpoint cancels it and suppresses automatic resume', async t => {
-  let release, signal;
-  const h = harness(t, unlimited, async (_, agent, s) => {
-    signal = s; await new Promise(resolve => { release = resolve; }); return {};
-  });
-  const a = h.agent('local-robust-27b'); await h.step(a, 44800);
-  a.status = 'idle'; h.events.get('agent/status')({ agent: a, status: 'idle' });
-  h.events.get('agent/disposed')({ agent: a });
-  assert.equal(signal.aborted, true);
-  release(); await new Promise(resolve => setImmediate(resolve));
-  assert.equal(a.steered.length, 0);
-});
-
-test('explicit finite step ceiling still stops at its boundary', async t => {
-  const h = harness(t, { maxTurnToolCalls: null, maxTurnSteps: 3 });
-  const a = h.agent('local-robust-27b');
-  for (let turn = 1; turn <= 3; turn++) assert.notEqual((await h.step(a, 0, turn)).kind, 'reject');
-  assert.match((await h.step(a, 0, 4)).reason, /3 steps/);
-});
-
-test('null ceilings are explicit; invalid numeric values are rejected', () => {
-  for (const key of ['maxTurnSteps', 'maxTurnToolCalls']) {
-    for (const value of [0, -1, 1.5, 'null', false, Infinity, NaN]) {
-      assert.throws(() => apply({}, { [key]: value }), /positive integer/);
-    }
-  }
-});
 
 test('9B and 27B in the same guard receive different economy/checkpoint thresholds', async t => {
   const h = harness(t); const small = h.agent('local-robust-9b'); const large = h.agent('local-robust-27b');

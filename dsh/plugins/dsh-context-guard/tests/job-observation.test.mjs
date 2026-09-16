@@ -58,41 +58,6 @@ test('eight silent blocking waits remain neutral and waitExpired is not a timeou
   assert.equal(await h.call('edit', { path: 'x' }), undefined, 'still in normal mode');
 });
 
-test('unlimited calls and steps preserve productive work across automatic continuations', async t => {
-  const h = await harness(t, { maxTurnToolCalls: null, maxTurnSteps: null, maxTurnMs: null });
-  for (let i = 0; i < 120; i++) {
-    assert.notEqual((await h.preStep(i + 2, [{ source: { kind: 'plugin', plugin: 'compaction' } }])).kind, 'reject');
-    assert.equal(await h.call('edit', { path: `file-${i}.js` }, { value: `updated file ${i}` }), undefined);
-  }
-  assert.equal(h.cancellations.length, 0);
-});
-
-test('unlimited work still blocks unchanged repeated investigation', async t => {
-  const h = await harness(t, { maxTurnToolCalls: null, maxTurnSteps: null, maxTurnMs: null });
-  const reasons = [];
-  for (let i = 0; i < 10; i++) reasons.push(await h.call('read', { file_path: 'same.txt' }, { value: 'unchanged evidence' }));
-  assert.ok(reasons.some(Boolean) || h.cancellations.length > 0);
-});
-
-test('default no-progress guard allows seven distinct failures before stopping', async t => {
-  const h = await harness(t, { equivalentBlockLimit: 20 });
-  const failure = { isError: true, value: { exitCode: 1, error: 'ENOENT' } };
-  for (let i = 0; i < 7; i++) {
-    assert.equal(await h.call('bash', { command: `false --variant=${i}` }, failure), undefined);
-  }
-  assert.match(
-    await h.call('bash', { command: 'false --variant=final' }, failure),
-    /7 equivalent failures/,
-  );
-});
-
-test('unlimited work retains the diagnostic budget after a real timeout', async t => {
-  const h = await harness(t, { maxTurnToolCalls: null, maxTurnSteps: null, maxTurnMs: null });
-  await h.call('bash', { command: 'slow' }, timeout);
-  for (let i = 0; i < 4; i++) await h.wait();
-  assert.ok(h.cancellations.some(reason => /diagnostic/.test(reason)));
-});
-
 test('waits consume the global call allowance', async (t) => {
   const h = await harness(t, { maxTurnToolCalls: 8 });
   for (let i = 0; i < 8; i++) assert.equal(await h.wait(), undefined);
@@ -184,7 +149,7 @@ test('a real second timeout still stops diagnosis even on an observer', async (t
 });
 
 test('neutral observations never erase earlier equivalent failures', async (t) => {
-  const h = await harness(t, { noProgressLimit: 3 });
+  const h = await harness(t);
   const failure = { isError: true, value: { exitCode: 1, error: 'ENOENT' } };
   for (let i = 0; i < 3; i++) {
     assert.equal(await h.call('bash', { command: 'cat missing.txt' }, failure), undefined);

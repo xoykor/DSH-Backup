@@ -1,0 +1,136 @@
+/**
+ * Test-run evidence classification for the red/green gates.
+ *
+ * The durable session log is the only source of truth: a shell tool call
+ * (`bash` / `pwsh`, including PTC sub-dispatches) whose command matches the
+ * configured test patterns is a test run, and its rendered result text
+ * carries the exit facts (`[exit code: N]`, timeout, signal, sandbox-denial
+ * markers). A failing run is red evidence; a passing run is green evidence.
+ *
+ * @module dsh-doublecheck/domain/evidence
+ */
+import type { SessionEvent } from '@deepseek-ai/dsh-session';
+/** Compiled red/green evidence detection knobs. */
+export interface TestRunDetection {
+    /** Tool names that can execute shell commands. */
+    testToolNames: readonly string[];
+    /** Regexes a command must match to count as a test run. */
+    testCommandPatterns: readonly RegExp[];
+    /** Mutation tool names (the targets the red gate watches). */
+    mutationTools: readonly string[];
+    /** Regexes identifying test-file paths, exempt from the red gate. */
+    testFilePatterns: readonly RegExp[];
+}
+/** Shared defaults: shell tools that can run tests. */
+export declare const DEFAULT_TEST_TOOL_NAMES: readonly string[];
+/** Shared defaults: commands that count as test runs. */
+export declare const DEFAULT_TEST_COMMAND_PATTERNS: readonly string[];
+/** Shared defaults: mutation tools and test-file path patterns. */
+export declare const DEFAULT_MUTATION_TOOLS: readonly string[];
+/** Shared defaults: paths that identify test files. */
+export declare const DEFAULT_TEST_FILE_PATTERNS: readonly string[];
+/** A classified test-run outcome. `undefined` = no usable evidence (infra failure, sandbox denial, background ack). */
+export type TestOutcome = 'pass' | 'fail';
+/** The raw knobs before regex compilation; invalid patterns fail loud at compile. */
+export interface DetectionConfig {
+    testToolNames: string[];
+    testCommandPatterns: string[];
+    guardTools: string[];
+    testFilePatterns: string[];
+}
+/**
+ * Compile the detection knobs, rejecting invalid regexes at load time.
+ * @param config - the raw string knobs from the guard config.
+ * @returns the compiled detection record.
+ */
+export declare function compileDetection(config: DetectionConfig): TestRunDetection;
+/** The detection record with every list empty: test-run evidence is ignored. */
+export declare function emptyDetection(): TestRunDetection;
+/** The rendered result blocks of a settled sub-dispatch (structural: only the fields the evidence folds read). */
+export type PtcContent = ReadonlyArray<{
+    type?: unknown;
+    text?: unknown;
+    content?: unknown;
+}>;
+/** One settled PTC sub-dispatch payload, whatever generation names the event. */
+export interface PtcSettle {
+    /** The dispatched tool name (`bash` / `pwsh` / `edit` / `write` …). */
+    name: string;
+    /** The dispatch arguments: a normalized record on the current line, a JSON string on the predecessor. */
+    arguments: unknown;
+    /** Whether the sub-dispatch failed at the infrastructure level. */
+    isError: boolean;
+    /** The rendered model-facing result blocks. */
+    content: PtcContent;
+}
+/**
+ * Normalize one settled PTC sub-dispatch event, across the event-vocabulary
+ * rename at the session-format V2→V3 edge.
+ *
+ * The current line names the settled sub-dispatch `tool/ptc-dispatch` (the
+ * host's V2→V3 migration renames the predecessor `tool/code-dispatch`, keeping
+ * the payload values), so a stored V2 log arrives under the new label. A host
+ * on the older release line still emits the predecessor label, which is outside
+ * this line's `SessionEventMap`; it is matched structurally instead of as a
+ * switch case, so the fold never depends on which generation wrote the log.
+ *
+ * @param event - one committed session event.
+ * @returns the settled payload, or `undefined` when the event is not a settled sub-dispatch.
+ */
+export declare function ptcSettle(event: SessionEvent): PtcSettle | undefined;
+/**
+ * Parse a raw tool-call `arguments` value (a JSON string from the model, or an
+ * already-normalized object from a PTC sub-dispatch) into a plain record.
+ * @param raw - the raw arguments value from the durable event.
+ * @returns the parsed record, or `undefined` when the string is not valid JSON.
+ */
+export declare function parseRawArguments(raw: string | unknown): Record<string, unknown> | undefined;
+/**
+ * The shell command a tool call would execute, when the tool is a configured
+ * test runner.
+ * @param name - the called tool name.
+ * @param args - the parsed arguments record.
+ * @param detection - the compiled detection knobs.
+ * @returns the command text, or `undefined` when this call is not a shell run.
+ */
+export declare function shellCommand(name: string, args: Record<string, unknown> | undefined, detection: TestRunDetection): string | undefined;
+/**
+ * Whether a shell command is a test run under the configured patterns.
+ * @param command - the command text.
+ * @param detection - the compiled detection knobs.
+ * @returns true when at least one pattern matches.
+ */
+export declare function isTestCommand(command: string, detection: TestRunDetection): boolean;
+/**
+ * The mutation target path of a tool call, when the tool is a configured
+ * mutation tool and its arguments name a file. Accepts both the DSH-native
+ * `file_path` key (`edit` / `write`) and the `path` key custom guard tools
+ * may use, so a configured tool is never mis-gated merely for its argument
+ * shape.
+ * @param name - the called tool name.
+ * @param args - the parsed arguments record.
+ * @param detection - the compiled detection knobs.
+ * @returns the target path, or `undefined` when the call does not name one.
+ */
+export declare function mutationTargetPath(name: string, args: Record<string, unknown> | undefined, detection: TestRunDetection): string | undefined;
+/**
+ * Whether a mutation target is itself a test file (writing the failing test
+ * is the red step, so test files stay editable).
+ * @param path - the mutation target path.
+ * @param detection - the compiled detection knobs.
+ * @returns true when the path matches a test-file pattern.
+ */
+export declare function isTestFilePath(path: string, detection: TestRunDetection): boolean;
+/**
+ * Classify the durable result of one test run from its model-facing text.
+ * @param text - the joined text blocks of the rendered result.
+ * @param isError - whether the tool call failed at the infrastructure level.
+ * @returns red/green evidence, or `undefined` when the run proves nothing.
+ */
+export declare function testOutcome(text: string, isError: boolean): TestOutcome | undefined;
+/** Join the text blocks of a rendered result into one searchable string. */
+export declare function joinTextBlocks(content: ReadonlyArray<{
+    type?: unknown;
+    text?: unknown;
+    content?: unknown;
+}>): string;

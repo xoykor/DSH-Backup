@@ -11,6 +11,9 @@ importers:
       dsh-context-guard:
         specifier: file:__DSH_HOME__/plugins/dsh-context-guard
         version: file:../../plugins/dsh-context-guard
+      dsh-continue-button:
+        specifier: link:__DSH_HOME__/plugins/dsh-continue-button
+        version: link:../../plugins/dsh-continue-button
       dsh-global-token-meter:
         specifier: link:__DSH_HOME__/plugins/dsh-global-token-meter
         version: link:../../plugins/dsh-global-token-meter
