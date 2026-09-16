@@ -56,6 +56,13 @@ function isTransientCompactionRejection(decision) {
 	const reason = decision?.reason;
 	return typeof reason === "string" && (reason === "CONTEXT-GUARD: waiting for the saved state checkpoint and compaction." || reason.startsWith("CONTEXT-GUARD: approximately "));
 }
+/** Whether a turn was aborted by the context guard's compaction checkpoint. */
+function isCompactionAbort(reason) {
+	const nested = reason?.kind === "aborted" ? reason.reason : reason;
+	if (nested?.kind === "context-guard-compaction") return true;
+	const message = nested?.reason;
+	return typeof message === "string" && /context.guard.*(?:checkpoint|compaction)/i.test(message);
+}
 /** Install automatic same-session continuation and its race fences. */
 function apply(ctx) {
 	const states = /* @__PURE__ */ new Map();
@@ -96,6 +103,34 @@ function apply(ctx) {
 			ctx.logger.warn(`goal-round-driver: could not disarm agent "${state.agent.id}": ${renderThrown(error)}`);
 		}
 	}
+	/** Resume only a goal that this driver can prove was stopped by compaction. */
+	function wasCompactionPaused(agent, goal) {
+		const events = typeof agent.session.snapshotEvents === "function" ? agent.session.snapshotEvents() : [];
+		let pauseIndex = -1;
+		for (let index = events.length - 1; index >= 0; index -= 1) {
+			const event = events[index];
+			if (event?.type === "goal/change" && event.data?.operation === "pause" && event.data.goal?.id === goal.id && event.data.goal?.revision === goal.revision) {
+				pauseIndex = index;
+				break;
+			}
+		}
+		if (pauseIndex < 0) return false;
+		const previous = events[pauseIndex - 1];
+		return previous?.type === "turn/end" && isCompactionAbort(previous.data?.reason);
+	}
+	/** Re-arm a durable active goal without involving the model-facing tool authority. */
+	function resumeAutomatically(state, goal) {
+		try {
+			ctx.goals.resume(state.agent, goalRef(goal));
+			state.needsCheckpoint = true;
+			requestDrive(state);
+			return true;
+		} catch (error) {
+			ctx.logger.warn(`goal-round-driver: could not automatically resume goal "${goal.id}" for agent "${state.agent.id}": ${renderThrown(error)}`);
+			disarm(state);
+			return false;
+		}
+	}
 	/** Preserve claimed step context when this driver drops only its own round. */
 	function restoreOtherClaimed(agent, messages, messageId) {
 		const retained = messages.filter((message) => message.id !== messageId && !(message.source.kind === "goal" && message.source.round === 0));
@@ -125,7 +160,15 @@ function apply(ctx) {
 			state.requested = true;
 			return;
 		}
-		const goal = currentGoal(state);
+		let goal = currentGoal(state);
+		if (goal?.phase === "paused" && wasCompactionPaused(agent, goal)) {
+			if (!resumeAutomatically(state, goal)) return;
+			return;
+		}
+		if (goal?.phase === "active" && goal.activation === "disarmed") {
+			if (!resumeAutomatically(state, goal)) return;
+			return;
+		}
 		if (goal === void 0 || goal.phase !== "active" || goal.activation !== "armed") return;
 		if (goal.roundsStarted >= goal.maxGoalRounds) {
 			ctx.goals.block(agent, goalRef(goal), {
@@ -153,6 +196,7 @@ function apply(ctx) {
 			content,
 			phase: "queued",
 			cancelled: false,
+			retryAfterCompaction: false,
 			stale: false
 		};
 		try {
@@ -217,6 +261,7 @@ function apply(ctx) {
 			state.attempt = void 0;
 			state.competingQueued = false;
 			state.needsCheckpoint = false;
+			requestDrive(state);
 		});
 		ctx.on("agent/status", ({ agent, status }) => {
 			const state = stateFor(agent);
@@ -224,7 +269,11 @@ function apply(ctx) {
 				state.competingQueued = false;
 				const attempt = state.attempt;
 				const goal = currentGoal(state);
-				if (attempt !== void 0 && (attempt.phase === "queued" || attempt.phase === "claimed" || attempt.cancelled) && goal !== void 0 && goal.phase === "active" && goal.activation === "armed" && attempt.goalId === goal.id && attempt.revision === goal.revision) {
+				const retryAfterCompaction = attempt?.retryAfterCompaction === true && goal !== void 0 && goal.phase === "active" && goal.activation === "armed" && attempt.goalId === goal.id && attempt.revision === goal.revision;
+				if (retryAfterCompaction) {
+					state.attempt = void 0;
+					state.needsCheckpoint = true;
+				} else if (attempt !== void 0 && (attempt.phase === "queued" || attempt.phase === "claimed" || attempt.cancelled) && goal !== void 0 && goal.phase === "active" && goal.activation === "armed" && attempt.goalId === goal.id && attempt.revision === goal.revision) {
 					state.attempt = void 0;
 					try {
 						ctx.goals.pause(agent, goalRef(goal));
@@ -272,6 +321,11 @@ function apply(ctx) {
 						return;
 					}
 					if (event.data.reason.kind !== "aborted") return;
+					if (isCompactionAbort(event.data.reason)) {
+						if (state.attempt?.phase === "queued" || state.attempt?.phase === "claimed" || state.attempt?.phase === "admitted") state.attempt.retryAfterCompaction = true;
+						else disarm(state);
+						return;
+					}
 					if (state.attempt?.phase === "claimed" || state.attempt?.phase === "admitted") state.attempt.cancelled = true;
 					else disarm(state);
 					return;
@@ -352,7 +406,11 @@ function apply(ctx) {
 				startsRequestSeries: true
 			};
 		});
-		for (const agent of ctx.agents.list()) disarm(stateFor(agent));
+		for (const agent of ctx.agents.list()) {
+			const state = stateFor(agent);
+			disarm(state);
+			requestDrive(state);
+		}
 		yield async () => {
 			const waits = [];
 			for (const state of states.values()) {

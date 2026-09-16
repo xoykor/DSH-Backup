@@ -36,11 +36,12 @@ export function applyPatch({ target, check = false } = {}) {
   const patched = readFileSync(join(here, manifest.relativeTarget));
   if (hash(patched) !== manifest.patchedSha256) throw new Error('Patch payload hash differs from manifest; refusing to write.');
   if (observed === manifest.patchedSha256) return { status: 'patched', changed: false, target: destination, sha256: observed };
-  if (observed !== manifest.baseSha256) throw new Error(`Unsupported runtime content at ${destination}: SHA-256 ${observed}; expected ${manifest.baseSha256} or ${manifest.patchedSha256}.`);
+  const acceptedPrevious = [manifest.previousPatchedSha256].filter(Boolean);
+  if (observed !== manifest.baseSha256 && !acceptedPrevious.includes(observed)) throw new Error(`Unsupported runtime content at ${destination}: SHA-256 ${observed}; expected ${manifest.baseSha256}, ${acceptedPrevious.join(', ')} or ${manifest.patchedSha256}.`);
   if (check) return { status: 'unpatched', changed: false, target: destination, sha256: observed };
-  const backup = `${destination}.before-goal-round-compaction-${manifest.baseSha256.slice(0, 12)}`;
+  const backup = `${destination}.before-goal-round-compaction-${observed === manifest.baseSha256 ? manifest.baseSha256.slice(0, 12) : `previous-${observed.slice(0, 12)}`}`;
   if (existsSync(backup)) {
-    if (hash(readFileSync(backup)) !== manifest.baseSha256) throw new Error(`Backup differs from the approved base: ${backup}`);
+    if (hash(readFileSync(backup)) !== observed) throw new Error(`Backup differs from the runtime content being replaced: ${backup}`);
   } else {
     copyFileSync(destination, backup, constants.COPYFILE_EXCL);
   }
@@ -49,7 +50,7 @@ export function applyPatch({ target, check = false } = {}) {
     writeFileSync(temporary, patched, { flag: 'wx', mode: statSync(destination).mode });
     chmodSync(temporary, statSync(destination).mode);
     // Refuse a concurrent external edit between reading and applying the patch.
-    if (hash(readFileSync(destination)) !== manifest.baseSha256) throw new Error('Runtime changed while preparing patch; refusing to replace it.');
+    if (hash(readFileSync(destination)) !== observed) throw new Error('Runtime changed while preparing patch; refusing to replace it.');
     renameSync(temporary, destination);
   } finally {
     if (existsSync(temporary)) unlinkSync(temporary);

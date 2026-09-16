@@ -14,6 +14,10 @@ test('runtime payload is the approved goal-round compaction patch', () => {
   assert.equal(hash(payload), manifest.patchedSha256);
   const source = payload.toString('utf8');
   assert.match(source, /isTransientCompactionRejection/);
+  assert.match(source, /isCompactionAbort/);
+  assert.match(source, /wasCompactionPaused/);
+  assert.match(source, /retryAfterCompaction/);
+  assert.match(source, /goal\.activation === "disarmed"/);
   assert.match(source, /requestDrive\(state\);/);
   assert.match(source, /code: "prompt-rejected"/);
 });
