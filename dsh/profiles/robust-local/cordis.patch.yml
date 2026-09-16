@@ -188,3 +188,9 @@
     # background-agents -> safe bare mount. host-only (no client bundle).
     - id: checkpoint-rewind
       name: __DSH_HOME__/plugins/dsh-checkpoint-rewind/index.mjs
+
+    # dsh-doublecheck v0.9.11: grill/guard double-check seam (confirm before act).
+    # Manifest uses the package-name form (name: dsh-doublecheck) but convention is bare-path, so
+    # mounted via lib/index.js. No reference to context-guard / auto-review / background-agents -> safe bare mount.
+    - id: doublecheck
+      name: __DSH_HOME__/plugins/dsh-doublecheck/lib/index.js
