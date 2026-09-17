@@ -39,3 +39,46 @@ return await tools.write({ file_path: "...", content });
 Use `JSON.stringify(value)` for generated JSON/object content. Escape a backtick or `${` only when it occurs in the content, keep writes short and auditable, and after a parse failure change the representation before retrying.
 
 Local Robust 9B and Local Robust 27B have no cumulative tool-call, step or whole-turn time ceiling (`maxTurnToolCalls: null`, `maxTurnSteps: null`, `maxTurnMs: null`). Continue authorized productive work through compaction until the requested deliverable is implemented and verified. Do not stop merely because 48 calls/steps or 15 minutes elapsed. Anti-loop checks, tool-specific timeouts, context compaction and the diagnostic budget remain enforced. Stop for user cancellation, missing authority or a demonstrated blocker with no productive alternative; report the evidence and pending work. Never claim completion solely to end a long run.
+
+## Skill catalog and locations
+
+The live catalog is rooted at `__DSH_HOME__/skills`. Load a matching skill by
+name with the DSH `skill` tool before acting, then follow its complete
+`SKILL.md`. Do not load every skill preemptively. Paths below are relative to
+`__DSH_HOME__`; the versioned source uses the same layout under `dsh/skills/`.
+
+For `prism-modpack`, loading `SKILL.md` is not the end of discovery: before the
+first Goal, web search or shell command of an operational task, read
+`skills/prism-modpack/references/operations.md` completely. `status` and
+`configure-wrapper` are subcommands of `scripts/modpack.py`, never `.sh` files.
+
+| Skill | Use when | Instruction file |
+|---|---|---|
+| `acompanhamento` | Waiting for managed long-running work and verifying its real completion. | `skills/acompanhamento/SKILL.md` |
+| `apresentacoes-template` | Filling an existing PPTX template and checking rendered slides. | `skills/apresentacoes-template/SKILL.md` |
+| `compressao-midia` | Compressing local images, audio or video with measured limits. | `skills/compressao-midia/SKILL.md` |
+| `configuracoes-estruturadas` | Editing explicit paths and values in JSON, YAML or TOML. | `skills/configuracoes-estruturadas/SKILL.md` |
+| `context-guard` | Applying the persistent context, checkpoint and loop policy; normally activated by the harness. | `skills/context-guard/SKILL.md` |
+| `dados-tabulares` | Transforming or reconciling local CSV, TSV or JSON tables. | `skills/dados-tabulares/SKILL.md` |
+| `diagnostico-servicos-logs` | Diagnosing local services, containers, URLs or log files without changing them. | `skills/diagnostico-servicos-logs/SKILL.md` |
+| `documentos-template` | Filling an existing DOCX template and validating its package and fields. | `skills/documentos-template/SKILL.md` |
+| `graficos-locais` | Generating PNG, SVG or PDF charts from validated local tables. | `skills/graficos-locais/SKILL.md` |
+| `imagens-lote` | Resizing, cropping, converting or thumbnailing local images in batches. | `skills/imagens-lote/SKILL.md` |
+| `jornadas-navegador` | Running short explicit browser journeys with checks and failure captures. | `skills/jornadas-navegador/SKILL.md` |
+| `local-single-agent` | Running development work with one local main agent and no delegated model calls. | `skills/local-single-agent/SKILL.md` |
+| `midia-local` | Inspecting, cutting, extracting or converting local audio and video with FFmpeg. | `skills/midia-local/SKILL.md` |
+| `organizacao-arquivos` | Planning and applying explicit batch copies or renames with collision checks. | `skills/organizacao-arquivos/SKILL.md` |
+| `paginas-estaticas` | Creating or adjusting a small local HTML/CSS page from a template. | `skills/paginas-estaticas/SKILL.md` |
+| `pdf-utilidades` | Inspecting or transforming PDFs, extracting text or running OCR. | `skills/pdf-utilidades/SKILL.md` |
+| `pesquisa-fontes` | Answering bounded external questions with consulted sources and separated inference. | `skills/pesquisa-fontes/SKILL.md` |
+| `planilhas-locais` | Creating or editing explicit cells, ranges, sheets or tables in local XLSX files. | `skills/planilhas-locais/SKILL.md` |
+| `prism-modpack` | Building complete Prism Launcher modpacks and correcting startup crashes from logs. | `skills/prism-modpack/SKILL.md` |
+| `quebra-de-loop` | Detecting and breaking redundant investigation loops. | `skills/quebra-de-loop/SKILL.md` |
+| `sqlite-local` | Inspecting schemas and querying local SQLite databases read-only. | `skills/sqlite-local/SKILL.md` |
+| `testes-api` | Checking authorized HTTP endpoints from a bounded JSON specification. | `skills/testes-api/SKILL.md` |
+| `tool-first` | Investigating local files, repositories and data with deterministic tools first. | `skills/tool-first/SKILL.md` |
+| `verificacao-projeto` | Discovering and running checks that already exist in a local project. | `skills/verificacao-projeto/SKILL.md` |
+
+Supporting `scripts/`, `references/`, `assets/`, `fixtures/` and `tests/` live
+inside the same skill directory. Resolve relative links from that skill's
+`SKILL.md`; do not guess paths in another skill.

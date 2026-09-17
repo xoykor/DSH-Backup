@@ -13,7 +13,9 @@
   config:
     auto: true
     thresholdRatio: 0.72
-    retainTokens: 32000
+    # Recent history is a fraction of the routed model window, so one policy
+    # scales consistently across 64k and 131k models.
+    retainRatio: 0.244140625
     maxTokens: 16384
     compactionRetries: 1
     maxOverflowRetries: 1
@@ -21,14 +23,14 @@
       - provider: lmstudio
         model: ornith-1.5-9b
         thresholdRatio: 0.70
-        retainTokens: 32000
+        retainRatio: 0.244140625
         maxTokens: 8192
         compactionRetries: 1
         maxOverflowRetries: 1
       - provider: lmstudio
         model: qwen3.8-27b-gsq-rco
         thresholdRatio: 0.70
-        retainTokens: 15625
+        retainRatio: 0.244140625
         maxTokens: 4000
         compactionRetries: 1
         maxOverflowRetries: 1
@@ -52,6 +54,13 @@
 - insert:
     - id: qwen-request-defaults
       name: __DSH_HOME__/plugins/dsh-qwen-defaults/lib/index.js
+    - id: system-search
+      name: __DSH_HOME__/plugins/dsh-system-search/index.mjs
+      config:
+        maxResults: 40
+        maxDepth: 6
+        maxEntries: 100000
+        timeoutMs: 8000
     - id: web-search-searxng
       name: __DSH_HOME__/plugins/dsh-web-search-searxng/index.mjs
       config:
@@ -65,24 +74,26 @@
         maxTurnSteps: null
         maxTurnToolCalls: null
         maxTurnMs: null
-        compactTokens: 91750
         contextWindow: 131072
-        responseMaxTokens: 24576
-        summaryMaxTokens: 8192
-        summaryMinTokens: 1024
-        safetyTokens: 4096
+        economyRatio: 0.5
+        checkpointRatio: 0.625
+        compactRatio: 0.7
+        responseRatio: 0.1875
+        summaryRatio: 0.0625
+        summaryMinRatio: 0.0078125
+        safetyRatio: 0.03125
       local-robust-27b:
         maxTurnSteps: null
         maxTurnToolCalls: null
         maxTurnMs: null
         contextWindow: 64000
-        responseMaxTokens: 12000
-        summaryMaxTokens: 4000
-        summaryMinTokens: 500
-        safetyTokens: 2000
-        economyTokens: 32000
-        checkpointTokens: 40000
-        compactTokens: 44800
+        economyRatio: 0.5
+        checkpointRatio: 0.625
+        compactRatio: 0.7
+        responseRatio: 0.1875
+        summaryRatio: 0.0625
+        summaryMinRatio: 0.0078125
+        safetyRatio: 0.03125
         resultFingerprintChars: 3906
     economyTokens: 65536
     checkpointTokens: 81920

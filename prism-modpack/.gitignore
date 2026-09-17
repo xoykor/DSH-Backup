@@ -1,0 +1,4 @@
+__pycache__/
+.modpack-work/
+downloads/
+catalog/*.json

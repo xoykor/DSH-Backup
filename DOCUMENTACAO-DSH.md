@@ -64,10 +64,14 @@ para ele.
 As ferramentas nativas expostas nesta sessão: `ask_user_question`, `bash`,
 `create_goal`, `edit`, `exit_plan_mode`, `get_goal`, `glob`, `grep`, `job_kill`,
 `job_list`, `job_output`, `read`, `skill`, `todo_write`, `update_goal`, `write`,
-`web_fetch`, `web_search`. A ferramenta `web_search` usa exclusivamente o provedor local
+`web_fetch`, `web_search` e `system_search`. `system_search` localiza por nome arquivos,
+diretórios, executáveis, aplicativos instalados e dados de aplicativos, incluindo
+locais ocultos como `~/.local/share`; deve ser usada antes de adivinhar caminhos,
+aplicar glob amplo ou tentar ler um diretório. A ferramenta `web_search` usa exclusivamente o provedor local
 SearXNG e pode ser descoberta no catálogo pelos termos `searxng`, `web`, `internet`,
 `busca`, `buscador` ou `pesquisa`. As ferramentas mapeiam-se aos bundles internos:
-`dsh-tool-bash/pwsh/fs/goal/jobs/skill/todo/subagent/workflow/web/ask-user/fs-search/present`.
+`dsh-tool-bash/pwsh/fs/goal/jobs/skill/todo/subagent/workflow/web/ask-user/fs-search/present`
+e ao plugin local `dsh-system-search`.
 
 ### 1.5 Skills (mecanismo)
 
@@ -102,6 +106,15 @@ tokens estimados e impõe limites duradouros por turno:
   atual e **um próximo passo**.
 - ≥ 94371: compactação automática (janela 131072, thresholdRatio 0.72).
 
+No perfil Web, o plugin `dsh-context-guard` também registra a seção **Contexto e
+compactação** nas configurações. Os sliders editam uma única política por preset:
+tamanho da janela, economia, checkpoint, limiar de compactação, reservas de
+resposta/resumo/segurança e retenção. Os valores absolutos em tokens são derivados
+dos ratios, e os limites entre campos são ajustados para preservar as reservas.
+O botão **Reiniciar DSH** solicita o reinício ao supervisor do host; quando o
+processo não foi iniciado sob um supervisor, a interface informa que a operação
+não está disponível em vez de encerrar o processo silenciosamente.
+
 Limites duros por turno (resets apenas com uma nova virada do usuário; a compactação
 não os renova): **48 passos, 48 chamadas de ferramenta, 15 minutos e 120 000 tokens
 high-water**. Após timeout, o executor gerencia o processo, coleta saída disponível e
@@ -117,7 +130,7 @@ Leituras idênticas, timeouts repetidos ou chamadas equivalentes **não** reseta
 
 ## 2. Skills implementadas — o que cada uma faz e como funciona
 
-### 2.1 Skills funcionais no repositório (22 skills live em `~/.dsh/skills/`)
+### 2.1 Skills funcionais no repositório (24 skills live em `~/.dsh/skills/`)
 
 | # | Skill | Foco / o que faz | Como funciona (resumo) |
 |---|-------|------------------|------------------------|
@@ -139,15 +152,15 @@ Leituras idênticas, timeouts repetidos ou chamadas equivalentes **não** reseta
 | 16 | **pdf-utilidades** | Inspecionar/transformar PDFs locais, extrair texto e OCR de páginas escaneadas/imagens. | Resultados verificáveis; preserva originais. |
 | 17 | **pesquisa-fontes** | Respostas curtas com afirmações ligadas a fontes realmente consultadas (fato/inferência/bloqueio). | Para perguntas externas delimitadas; não é pesquisa autônoma extensa. |
 | 18 | **planilhas-locais** | Criar/editar XLSX locais em células/intervalos/abas/tabelas explícitos. | Preserva conteúdo fora do alvo e declara situação de recálculo. |
-| 19 | **quebra-de-loop** | Check automatizado contra loops de investigação redundante + guia para quebrá-los. | Antes de cada passo, exige evidência suficiente; nunca repete leituras equivalentes. |
-| 20 | **sqlite-local** | Inspecionar schema e consultar bancos SQLite locais somente leitura (parâmetros/limites). | Exporta JSON ou CSV. |
-| 21 | **testes-api** | Verificar endpoints HTTP autorizados com especificação JSON limitada (status/cabeçalhos/corpo). | Sem repetir requisições nem vazar segredos. |
-| 22 | **verificacao-projeto** | Descobrir e executar verificações que já existem em um projeto (timeout + relatório de evidências). | Não inventa comandos nem altera o projeto. |
+| 19 | **prism-modpack** | Montar modpacks completos no Prism e corrigir crashes de inicialização pelos logs. | Instala em lote; não testa mods individualmente nem gameplay por padrão. |
+| 20 | **quebra-de-loop** | Check automatizado contra loops de investigação redundante + guia para quebrá-los. | Antes de cada passo, exige evidência suficiente; nunca repete leituras equivalentes. |
+| 21 | **sqlite-local** | Inspecionar schema e consultar bancos SQLite locais somente leitura (parâmetros/limites). | Exporta JSON ou CSV. |
+| 22 | **testes-api** | Verificar endpoints HTTP autorizados com especificação JSON limitada (status/cabeçalhos/corpo). | Sem repetir requisições nem vazar segredos. |
+| 23 | **tool-first** | Investigar arquivos e dados com ferramentas determinísticas e saída limitada. | Prefere ferramenta pronta, Bash curto e scratch delimitado. |
+| 24 | **verificacao-projeto** | Descobrir e executar verificações que já existem em um projeto (timeout + relatório de evidências). | Não inventa comandos nem altera o projeto. |
 
-> **Discrepância de documentação:** [`INSTALACAO.md`](./INSTALACAO.md) §9 lista 20
-> skills; o live tem **22** (`acompanhamento` e `quebra-de-loop` não estavam na tabela).
 > O `HANDOFF.md` ainda referencia uma skill `declaracao-capacidade` que **não está** em
-> `~/.dsh/skills/`. Ou seja: os docs estão ligeiramente defasados do live.
+> `~/.dsh/skills/`.
 
 ### 2.2 Como as skills funcionam (mecanismo comum)
 
@@ -172,7 +185,7 @@ Leituras idênticas, timeouts repetidos ou chamadas equivalentes **não** reseta
 | L5 | **Approval prompts desativados** nesta sessão: ações que exigem aprovação são rejeitadas automaticamente; o agente **não** pode pedir escalonamento de sandbox nem auto-conceder capacidade. | instrução de sessão, `HANDOFF.md` §23 |
 | L6 | **`update_goal` sem campo para read-only-executor capability** → agente não pode auto-habilitar; resolução = habilitação pelo operador/nível de sessão. | `HANDOFF.md` §23 |
 | L7 | **Goal antigo (Scryfall scrape)** só parcialmente visível na imagem; `get_goal` retorna apenas o goal ativo — não dá para editar sem objetivo/revision completos + capacidade. | `HANDOFF.md` §24 |
-| L8 | **Docs defasados do live** — INSTALACAO.md diz 20 skills (live=22); HANDOFF menciona skill `declaracao-capacidade` ausente no live. | ver §2.1 |
+| L8 | **Referência histórica ausente** — HANDOFF menciona skill `declaracao-capacidade`, que não existe no live. | ver §2.1 |
 | L9 | **Perfil `desktop` reservado** ao Electron; CLI rejeita boot/config-dump/plugin-management para ele. | `@deepseek-ai/dsh/README.md` |
 | L10 | **Comandos inválidos / flags de outro modo / erros de config / boot falho → exit nonzero.** | `@deepseek-ai/dsh/README.md` |
 | L11 | **Backup exclui intencionalmente** sessões, histórico, caches, estado do navegador e credenciais → reautenticar após restore. | `README.md`, `.gitignore` |

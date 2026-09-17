@@ -36,6 +36,11 @@ llm-pi-ai:
           input:
             - text
             - image
+          # Ornith exposes binary reasoning through LM Studio. Declaring the
+          # levels makes the DSH model picker show an Off/High selector.
+          reasoningEfforts:
+            off: "none"
+            high: "xhigh"
         - id: qwen3.8-27b-gsq-rco
           name: Qwen 3.8 27B GSQ RCO
           contextWindow: 64000
@@ -52,5 +57,18 @@ llm-pi-ai:
 agent-default-model:
   provider: lmstudio
   model: ornith-1.5-9b
+  reasoningEffort: high
 permission:
   defaultPreset: danger-full-access
+dsh-context-guard:
+  presets:
+    local-robust-9b:
+      contextWindow: 64000
+      economyRatio: 0.5
+      checkpointRatio: 0.625
+      compactRatio: 0.7185
+      responseRatio: 0.1875
+      summaryRatio: 0.063
+      summaryMinRatio: 0.033
+      safetyRatio: 0.021
+      retainRatio: 0.205

@@ -20,15 +20,16 @@ llm-pi-ai:
           # larger training-time context limit.
           contextWindow: 131072
           maxTokens: 24576
-          # Ornith exposes binary reasoning options through LM Studio.
+          # Map DSH levels to the OpenAI Responses enum accepted by LM Studio
+          # and to the low/medium/xhigh levels supported by Ornith's template.
           reasoningEfforts:
-            off: "off"
-            minimal: "on"
-            low: "on"
-            medium: "on"
-            high: "on"
-            xhigh: "on"
-            max: "on"
+            off: "none"
+            minimal: "low"
+            low: "low"
+            medium: "medium"
+            high: "xhigh"
+            xhigh: "xhigh"
+            max: "xhigh"
         - id: qwen3.8-27b-gsq-rco
           name: Qwen 3.8 27B GSQ RCO
           contextWindow: 64000

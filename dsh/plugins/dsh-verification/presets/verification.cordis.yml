@@ -43,6 +43,7 @@
         - ask_user_question
         - get_goal
         - get_verification_plan
+        - system_search
         - web_search
       sourceBasis:
         includeAttachments: true

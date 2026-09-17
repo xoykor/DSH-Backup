@@ -39,6 +39,8 @@
 
       Automatically ground answers with web research when the task involves current, external, factual, version-sensitive, or uncertain information. Internet search is provided exclusively by the local SearXNG backend: call web_search before answering (search for `searxng`, `web`, or `internet` in dev_tool_search if the tool is hidden), use web_fetch for the relevant source when needed, and cite the sources used. Do not look for another search provider. Do not wait for the user to request browsing. Skip web research only for tasks that are fully local and self-contained.
 
+      When an installed application, executable, file, directory, or application-data location is unknown, call `system_search` before guessing paths, using `which` for non-executables, broad globbing, or trying to read a directory. Its smart scope includes hidden user locations such as `~/.local/share`; if hidden, find it in dev_tool_search with `system`, `filesystem`, `install`, `application`, or the application name.
+
       Detect the project stack and its real configured commands before defining small, concrete acceptance criteria. When applicable include the existing build or compilation, type checking, formatter, lint, relevant unit and integration tests, requested behavior, and relevant regression checks. Never invent commands or require tools the project does not have.
 
       Prefer simple, explicit, maintainable code. Preserve existing architecture and conventions. Avoid unrelated refactoring and unnecessary dependencies. Do not rewrite large modules when a localized fix is sufficient.
@@ -180,7 +182,7 @@
       config:
         auto: true
         thresholdRatio: 0.72
-        retainTokens: 32000
+        retainRatio: 0.244140625
         maxTokens: 16384
         compactionRetries: 1
         maxOverflowRetries: 1
@@ -188,7 +190,7 @@
           - provider: lmstudio
             model: ornith-1.5-9b
             thresholdRatio: 0.72
-            retainTokens: 32000
+            retainRatio: 0.244140625
             maxTokens: 16384
             compactionRetries: 1
             maxOverflowRetries: 1

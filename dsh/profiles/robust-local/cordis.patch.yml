@@ -6,24 +6,26 @@
         maxTurnSteps: null
         maxTurnToolCalls: null
         maxTurnMs: null
-        compactTokens: 91750
         contextWindow: 131072
-        responseMaxTokens: 24576
-        summaryMaxTokens: 8192
-        summaryMinTokens: 1024
-        safetyTokens: 4096
+        economyRatio: 0.5
+        checkpointRatio: 0.625
+        compactRatio: 0.7
+        responseRatio: 0.1875
+        summaryRatio: 0.0625
+        summaryMinRatio: 0.0078125
+        safetyRatio: 0.03125
       local-robust-27b:
         maxTurnSteps: null
         maxTurnToolCalls: null
         maxTurnMs: null
         contextWindow: 64000
-        responseMaxTokens: 12000
-        summaryMaxTokens: 4000
-        summaryMinTokens: 500
-        safetyTokens: 2000
-        economyTokens: 32000
-        checkpointTokens: 40000
-        compactTokens: 44800
+        economyRatio: 0.5
+        checkpointRatio: 0.625
+        compactRatio: 0.7
+        responseRatio: 0.1875
+        summaryRatio: 0.0625
+        summaryMinRatio: 0.0078125
+        safetyRatio: 0.03125
         resultFingerprintChars: 3906
     economyTokens: 65536
     checkpointTokens: 81920
@@ -91,6 +93,7 @@
             - ask_user_question
             - get_goal
             - get_verification_plan
+            - system_search
             - web_search
           sourceBasis:
             includeAttachments: true

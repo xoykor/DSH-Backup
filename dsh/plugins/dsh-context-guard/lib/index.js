@@ -4,9 +4,132 @@
  * The plugin intentionally depends only on public Cordis services. Decisions
  * that stop a turn are made by the executor, not by a model instruction.
  */
+import { deriveAbsoluteBudgets, ratiosFromBudgets, validateBudgets } from './policy.js';
+
 export const name = 'dsh-context-guard';
 export const inject = ['tools', 'tokenMeter', 'compaction'];
 const CHECKPOINT_POLICY = Symbol.for('dsh.contextGuard.checkpointPolicy.v1');
+export const SETTINGS_NAMESPACE = 'dsh-context-guard';
+
+const SETTINGS_RATIO_FIELDS = Object.freeze([
+  ['economyRatio', 'economy'],
+  ['checkpointRatio', 'checkpoint'],
+  ['compactRatio', 'compact'],
+  ['responseRatio', 'response'],
+  ['summaryRatio', 'summary'],
+  ['summaryMinRatio', 'summaryMin'],
+  ['safetyRatio', 'safety'],
+  ['retainRatio', 'retain'],
+]);
+
+function policySettings(policy) {
+  const ratios = ratiosFromBudgets(policy);
+  return Object.freeze({
+    contextWindow: policy.contextWindow,
+    ...Object.fromEntries(SETTINGS_RATIO_FIELDS.map(([field, name]) => [field, ratios[name]])),
+  });
+}
+
+function settingsEntry(policies) {
+  return {
+    presets: Object.fromEntries([...policies.entries()]
+      .filter(([, policy]) => policy.contextWindow !== undefined)
+      .map(([id, policy]) => [id, policySettings(policy)])),
+  };
+}
+
+async function installSettings(ctx, state, policies, baseConfig, rawPolicies, notifyChange) {
+  try {
+    const [{ default: Schema }, dshSettings] = await Promise.all([
+      import('@deepseek-ai/schemastery'),
+      import('@deepseek-ai/dsh-settings'),
+    ]);
+    const ratioSchema = Schema.number();
+    const policySchema = Schema.object({
+      contextWindow: Schema.number(),
+      economyRatio: ratioSchema,
+      checkpointRatio: ratioSchema,
+      compactRatio: ratioSchema,
+      responseRatio: ratioSchema,
+      summaryRatio: ratioSchema,
+      summaryMinRatio: ratioSchema,
+      safetyRatio: ratioSchema,
+      retainRatio: ratioSchema,
+    });
+    const settingsSchema = Schema.object({ presets: Schema.dict(policySchema).default({}) });
+    const entry = settingsEntry(policies);
+    const hooks = {
+      setSource: (source) => { state.source = source; },
+      onChange: () => {
+        state.current = state.source?.();
+        notifyChange?.();
+      },
+      validate: (value) => {
+        if (!value || typeof value !== 'object' || typeof value.presets !== 'object') {
+          throw new Error('dsh-context-guard: settings must contain a presets object');
+        }
+        for (const [preset, values] of Object.entries(value.presets)) {
+          const raw = rawPolicies.get(preset) ?? {};
+          resolveConfig({ ...baseConfig, ...raw, ...values });
+        }
+      },
+    };
+    const settingsModule = dshSettings;
+    ctx.inject?.(['settings'], (sctx) => {
+      const moduleInstall = settingsModule.installSettingsSection;
+      if (typeof moduleInstall === 'function') {
+        moduleInstall(sctx, SETTINGS_NAMESPACE, settingsSchema, entry, hooks);
+        return;
+      }
+      const settingsService = sctx.settings;
+      if (typeof settingsService?.installSection !== 'function') return;
+      settingsService.installSection(ctx, SETTINGS_NAMESPACE, settingsSchema, entry, hooks);
+    });
+  } catch (error) {
+    ctx.logger?.warn?.('dsh-context-guard: settings UI unavailable: ' + (error instanceof Error ? error.message : String(error)));
+  }
+}
+
+function sendJson(res, status, value) {
+  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify(value));
+}
+
+function installRestartRoute(ctx) {
+  const install = (webServer) => {
+    if (typeof webServer?.register !== 'function') return;
+    const dispose = webServer.register({
+      kind: 'exact',
+      path: '/api/context-guard/restart',
+      handler: async (req, res) => {
+        if (req.method !== undefined && req.method !== 'POST') {
+          sendJson(res, 405, { error: 'method_not_allowed' });
+          return;
+        }
+        // The DSH CLI's Loader.exit() is intentionally a no-op hook. The
+        // launcher exposes the real graceful process lifecycle as appExit.
+        const appExit = ctx.get?.('appExit');
+        if (typeof appExit !== 'function') {
+          sendJson(res, 501, { error: 'restart_unavailable', message: 'O host DSH não expõe um supervisor de reinício.' });
+          return;
+        }
+        sendJson(res, 202, { accepted: true, message: 'Reinício do DSH solicitado ao host.' });
+        setImmediate(() => appExit(0));
+      },
+    });
+    ctx.effect?.(() => dispose, 'dsh-context-guard: restart route');
+  };
+  const current = ctx.get?.('webServer');
+  if (current !== undefined && current !== null) {
+    install(current);
+    return;
+  }
+  const off = ctx.on?.('internal/service', (serviceName) => {
+    if (serviceName !== 'webServer') return;
+    off?.();
+    install(ctx.get?.('webServer'));
+  });
+}
 
 const DEFAULTS = Object.freeze({
   economyTokens: 131_072,
@@ -43,16 +166,19 @@ function resolveConfig(raw = {}) {
     'maxTurnTokens', 'diagnosticMaxCalls', 'diagnosticMaxMs',
     'diagnosticMaxTokens', 'textSimilarity', 'resultFingerprintChars',
     'contextWindow', 'summaryMaxTokens', 'summaryMinTokens', 'safetyTokens', 'responseMaxTokens',
+    'economyRatio', 'checkpointRatio', 'compactRatio', 'responseRatio',
+    'summaryRatio', 'summaryMinRatio', 'safetyRatio', 'retainRatio',
   ]);
   for (const key of Object.keys(raw)) {
     if (!knownKeys.has(key)) {
       throw new Error('dsh-context-guard: unknown configuration key "' + key + '"');
     }
   }
+  const derived = deriveAbsoluteBudgets(raw);
   const config = {
-    economyTokens: positiveInteger(raw.economyTokens, DEFAULTS.economyTokens, 'economyTokens'),
-    checkpointTokens: positiveInteger(raw.checkpointTokens, DEFAULTS.checkpointTokens, 'checkpointTokens'),
-    compactTokens: positiveInteger(raw.compactTokens, DEFAULTS.compactTokens, 'compactTokens'),
+    economyTokens: positiveInteger(derived.economyTokens, DEFAULTS.economyTokens, 'economyTokens'),
+    checkpointTokens: positiveInteger(derived.checkpointTokens, DEFAULTS.checkpointTokens, 'checkpointTokens'),
+    compactTokens: positiveInteger(derived.compactTokens, DEFAULTS.compactTokens, 'compactTokens'),
     noProgressLimit: positiveInteger(raw.noProgressLimit, DEFAULTS.noProgressLimit, 'noProgressLimit'),
     equivalentBlockLimit: positiveInteger(raw.equivalentBlockLimit, DEFAULTS.equivalentBlockLimit, 'equivalentBlockLimit'),
     maxTurnSteps: raw.maxTurnSteps === null ? null : positiveInteger(raw.maxTurnSteps, DEFAULTS.maxTurnSteps, 'maxTurnSteps'),
@@ -68,15 +194,12 @@ function resolveConfig(raw = {}) {
       : undefined,
     textSimilarity: raw.textSimilarity ?? DEFAULTS.textSimilarity,
     resultFingerprintChars: positiveInteger(raw.resultFingerprintChars, DEFAULTS.resultFingerprintChars, 'resultFingerprintChars'),
-    contextWindow: positiveInteger(raw.contextWindow, undefined, 'contextWindow'),
-    summaryMaxTokens: positiveInteger(raw.summaryMaxTokens, undefined, 'summaryMaxTokens'),
-    summaryMinTokens: positiveInteger(raw.summaryMinTokens, undefined, 'summaryMinTokens'),
-    safetyTokens: positiveInteger(raw.safetyTokens, undefined, 'safetyTokens'),
-    responseMaxTokens: positiveInteger(raw.responseMaxTokens, undefined, 'responseMaxTokens'),
+    contextWindow: positiveInteger(derived.contextWindow, undefined, 'contextWindow'),
+    summaryMaxTokens: positiveInteger(derived.summaryMaxTokens, undefined, 'summaryMaxTokens'),
+    summaryMinTokens: positiveInteger(derived.summaryMinTokens, undefined, 'summaryMinTokens'),
+    safetyTokens: positiveInteger(derived.safetyTokens, undefined, 'safetyTokens'),
+    responseMaxTokens: positiveInteger(derived.responseMaxTokens, undefined, 'responseMaxTokens'),
   };
-  if (!(config.economyTokens < config.checkpointTokens && config.checkpointTokens < config.compactTokens)) {
-    throw new Error('dsh-context-guard: economyTokens < checkpointTokens < compactTokens is required');
-  }
   if (config.maxTurnToolCalls !== null && config.diagnosticMaxCalls > config.maxTurnToolCalls) {
     throw new Error('dsh-context-guard: diagnosticMaxCalls must be <= maxTurnToolCalls');
   }
@@ -88,6 +211,7 @@ function resolveConfig(raw = {}) {
       throw new Error('dsh-context-guard: complete checkpoint reserves required; compactTokens + responseMaxTokens + summaryMaxTokens + safetyTokens must be < contextWindow');
     }
   }
+  validateBudgets(config);
   if (typeof config.textSimilarity !== 'number' || config.textSimilarity < 0.8 || config.textSimilarity > 1) {
     throw new Error('dsh-context-guard: textSimilarity must be between 0.8 and 1');
   }
@@ -466,20 +590,31 @@ export function apply(ctx, rawConfig = {}) {
   if (!presetPolicies || typeof presetPolicies !== 'object' || Array.isArray(presetPolicies)) {
     throw new Error('dsh-context-guard: presetPolicies must be an object');
   }
-  const policies = new Map(Object.entries(presetPolicies).map(([id, overrides]) => {
+  const rawPolicies = new Map(Object.entries(presetPolicies).map(([id, overrides]) => {
     if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)) {
       throw new Error('dsh-context-guard: preset policy must be an object: ' + id);
     }
-    return [id, resolveConfig({ ...baseConfig, ...overrides })];
+    return [id, overrides];
   }));
+  const policies = new Map([...rawPolicies.entries()].map(([id, overrides]) => [id, resolveConfig({ ...baseConfig, ...overrides })]));
+  const settingsState = { source: undefined, current: undefined };
   const presetService = () => ctx.get?.('agentPresets') ?? ctx.agentPresets;
-  const configFor = (agent) => policies.get(presetService()?.composedPreset(agent?.ctx)) ?? config;
+  const configFor = (agent) => {
+    const preset = presetService()?.composedPreset(agent?.ctx);
+    const configured = policies.get(preset);
+    const uiPolicy = settingsState.current?.presets?.[preset];
+    if (configured === undefined || uiPolicy === undefined) return configured ?? config;
+    return resolveConfig({ ...baseConfig, ...(rawPolicies.get(preset) ?? {}), ...uiPolicy });
+  };
   // Available before the first pre-step: native middleware must not compact
   // a resumed session before the guard has created its per-agent state.
   ctx.provide?.('contextGuardPolicy', { forAgent: configFor });
   const states = new WeakMap();
   const sessionStates = new Map();
   const jobCalls = new WeakMap();
+  let refreshNativeContextMeters = () => {};
+  void installSettings(ctx, settingsState, policies, baseConfig, rawPolicies, () => refreshNativeContextMeters());
+  installRestartRoute(ctx);
 
   const stateFor = (agent) => {
     let state = states.get(agent);
@@ -495,6 +630,50 @@ export function apply(ctx, rawConfig = {}) {
     if (state.config.contextWindow !== undefined) agent[CHECKPOINT_POLICY] = state.config;
     else delete agent[CHECKPOINT_POLICY];
     return state;
+  };
+
+  // The native DSH context meter reads the newest durable `request/context`
+  // event. The model adapter publishes its physical capacity there (for
+  // example 131K), while this guard deliberately runs with a smaller budget.
+  // Publish a corrected context event after the adapter event has completed so
+  // the native projection and UI use the same budget as the guard. Appending
+  // directly from a session/event observer is rejected by Session, therefore
+  // the correction is deferred to the next microtask.
+  const contextMeterCorrections = new WeakSet();
+  const syncNativeContextMeter = (session, event) => {
+    if (event.type !== 'request/context') return;
+    const state = sessionStates.get(String(session.id));
+    const contextWindow = state?.config?.contextWindow;
+    if (!Number.isInteger(contextWindow) || contextWindow <= 0
+      || event.data?.contextWindow === contextWindow
+      || contextMeterCorrections.has(session)) return;
+    contextMeterCorrections.add(session);
+    queueMicrotask(() => {
+      contextMeterCorrections.delete(session);
+      const currentState = sessionStates.get(String(session.id));
+      const currentWindow = currentState?.config?.contextWindow;
+      if (!Number.isInteger(currentWindow) || currentWindow <= 0) return;
+      const latest = session.requestContext?.() ?? event.data;
+      if (!latest?.provider || !latest?.model || latest.contextWindow === currentWindow) return;
+      try {
+        session.append('request/context', {
+          provider: latest.provider,
+          model: latest.model,
+          contextWindow: currentWindow,
+          ...(latest.systemPromptUpdate === undefined ? {} : { systemPromptUpdate: latest.systemPromptUpdate }),
+        });
+      } catch (error) {
+        ctx.logger?.warn?.('dsh-context-guard: native context meter sync failed: ' + (error instanceof Error ? error.message : String(error)));
+      }
+    });
+  };
+  refreshNativeContextMeters = () => {
+    for (const state of sessionStates.values()) {
+      if (!state.agent?.session) continue;
+      stateFor(state.agent);
+      const latest = state.agent.session.requestContext?.();
+      if (latest) syncNativeContextMeter(state.agent.session, { type: 'request/context', data: latest });
+    }
   };
 
   const clearTimer = (timer) => {
@@ -1064,6 +1243,7 @@ export function apply(ctx, rawConfig = {}) {
   ctx.on('session/event', (session, event) => {
     const state = sessionStates.get(String(session.id));
     if (!state) return;
+    syncNativeContextMeter(session, event);
     if (event.type === 'assistant/message' && event.data?.turn === state.currentTurn) {
       const amount = tokenUsageAmount(event.data?.usage);
       if (amount !== undefined) {

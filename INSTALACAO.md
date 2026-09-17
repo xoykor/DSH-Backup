@@ -31,7 +31,7 @@ capturado da instalação real (`~/.dsh` e `~/.codex`).
 ├── settings.yaml          # modelos, janelas, políticas de contexto/plugins
 ├── cordis.patch.yml       # patch de política de modelo (ornith/qwen defaults)
 ├── workspace.json         # estado da área de trabalho
-├── skills/                # 20 skills
+├── skills/                # 24 skills
 ├── profiles/              # 3 perfis (headless, robust-local, web)
 ├── plugins/               # 8 plugins
 ├── bridges/               # 1 bridge (FreeDeepseekAPI-EN)
@@ -113,7 +113,7 @@ Estado da área de trabalho (não versionado por segredos/sessões).
 
 ---
 
-## 7. Plugins (`plugins/`) — 8
+## 7. Plugins (`plugins/`) — 9
 
 | Plugin | Função (resumo) |
 |--------|-----------------|
@@ -122,6 +122,7 @@ Estado da área de trabalho (não versionado por segredos/sessões).
 | `dsh-global-token-meter` | Medição global de tokens na sessão. |
 | `dsh-goal-verification` | Verificação de metas/objetivos. |
 | `dsh-qwen-defaults` | Defaults do Qwen (injetado via cordis.patch.yml). |
+| `dsh-system-search` | Busca local por arquivos, diretórios, executáveis, aplicativos e dados ocultos de usuário. |
 | `dsh-tool-browser` | Wrapper de ferramentas de navegador. |
 | `dsh-verification` | Verificação geral (com README, CHANGELOG, PROJECT_STATUS). |
 | `dsh-web-search-searxng` | Busca web via instância SearXNG. |
@@ -136,10 +137,11 @@ Estado da área de trabalho (não versionado por segredos/sessões).
 
 ---
 
-## 9. Skills (`skills/`) — 20
+## 9. Skills (`skills/`) — 24
 
 | Skill | Foco |
 |-------|------|
+| `acompanhamento` | Acompanhamento de jobs e artefatos. |
 | `apresentacoes-template` | Templates de apresentações. |
 | `compressao-midia` | Compressão de mídia. |
 | `configuracoes-estruturadas` | Configurações estruturadas. |
@@ -157,8 +159,11 @@ Estado da área de trabalho (não versionado por segredos/sessões).
 | `pdf-utilidades` | Utilidades PDF. |
 | `pesquisa-fontes` | Pesquisa com fontes. |
 | `planilhas-locais` | Planilhas locais. |
+| `prism-modpack` | Montagem de modpacks e correção de crashes pelo Prism. |
+| `quebra-de-loop` | Interromper investigação redundante. |
 | `sqlite-local` | SQLite local. |
 | `testes-api` | Testes de API. |
+| `tool-first` | Investigação local determinística. |
 | `verificacao-projeto` | Verificação de projeto. |
 
 ---

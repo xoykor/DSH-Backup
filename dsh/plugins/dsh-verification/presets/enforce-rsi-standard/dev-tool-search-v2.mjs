@@ -47,6 +47,7 @@ function toJsonSchema(spec) {
  */
 const UNLOCKABLE_INDEX = [
   'web_search — internet search through the local SearXNG provider',
+  'system_search — locate files, directories, executables, installed applications, and application data by name',
   'subagent / subagent_fork — delegate work to sub-agents',
   'workflow — run multi-agent workflow scripts',
   'ralph — fresh-agent iterative loop',
@@ -60,6 +61,7 @@ const UNLOCKABLE_INDEX = [
 
 const DISCOVERY_ALIASES = {
   web_search: 'searxng local metasearch web internet search busca buscador pesquisa',
+  system_search: 'system filesystem local files directories folders executable installed application app data hidden path locate find search busca sistema arquivo diretorio pasta executavel instalacao aplicativo programa prism launcher local share',
 }
 
 /** Register the model-facing `dev_tool_search` tool. */

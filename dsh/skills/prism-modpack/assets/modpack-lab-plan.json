@@ -1,0 +1,177 @@
+{
+  "minecraft": "1.21.1",
+  "loader": "neoforge",
+  "loader_version": "21.1.250",
+  "mods": [
+    {
+      "file": "downloads/create-aeronautics-bundled-1.21.1-1.3.2.jar",
+      "sha256": "a3f330d4757640f8715d991a43eedb826e4d0e51558d859c843ae6693bd35f1e",
+      "required": true,
+      "name": "Create Aeronautics",
+      "version": "1.3.2+mc1.21.1",
+      "project_id": "oWaK0Q19",
+      "version_id": "44pLdPGg",
+      "source": "https://modrinth.com/mod/create-aeronautics"
+    },
+    {
+      "file": "downloads/create-1.21.1-6.0.10.jar",
+      "sha256": "ef87fe5709f1ba1f5b8bb20a2925b5afb4669e178fd6d8bf10c167759eefe37a",
+      "required": true,
+      "name": "Create",
+      "version": "6.0.10+mc1.21.1",
+      "project_id": "LNytGWDc",
+      "version_id": "UjX6dr61",
+      "source": "https://modrinth.com/mod/create"
+    },
+    {
+      "file": "downloads/create-gunsmithing-1.21.1-1.4.9.jar",
+      "sha256": "d9e00c7e9cc5dec11455d42dd0f6d78418ce2213c4740ca8bec6b1e0e73adf1d",
+      "required": true,
+      "name": "Create: Gunsmithing",
+      "version": "1.4.9",
+      "project_id": "7KCNsGPM",
+      "version_id": "AmBZCjMo",
+      "source": "https://modrinth.com/mod/cgs"
+    },
+    {
+      "file": "downloads/createaddition-1.6.0.jar",
+      "sha256": "41876c3780b70365a1848994d146a73423cc19fbe86485885795d9e7d855e7e9",
+      "required": true,
+      "name": "Create Crafts & Additions",
+      "version": "neoforge-1.21.1-1.6.0",
+      "project_id": "kU1G12Nn",
+      "version_id": "qPr8V4G2",
+      "source": "https://modrinth.com/mod/createaddition"
+    },
+    {
+      "file": "downloads/createdeco-2.1.3.jar",
+      "sha256": "edacf1ad0bd6b9f1667d711650dc0cde604356d91caca7ca1ec428c2f9400c6e",
+      "required": true,
+      "name": "Create Deco",
+      "version": "2.1.3",
+      "project_id": "sMvUb4Rb",
+      "version_id": "qrcMVoBD",
+      "source": "https://modrinth.com/mod/create-deco"
+    },
+    {
+      "file": "downloads/create_connected-1.3.3-mc1.21.1.jar",
+      "sha256": "0c5eb9ffb5c8d71e6e2a39023feb85c51adfb10d38949bc47c4abbd53b351a4f",
+      "required": true,
+      "name": "Create: Connected",
+      "version": "1.3.3-mc1.21.1",
+      "project_id": "Vg5TIO6d",
+      "version_id": "Xe7EqzfQ",
+      "source": "https://modrinth.com/mod/create-connected"
+    },
+    {
+      "file": "downloads/IllagerInvasion-v21.1.6-1.21.1-NeoForge.jar",
+      "sha256": "5adfdd0df0c5dbe81e4458da50442b58863f9db9f22abc182f81e487eef0e6db",
+      "required": true,
+      "name": "Illager Invasion",
+      "version": "v21.1.6-1.21.1-NeoForge",
+      "project_id": "jSV9w0J5",
+      "version_id": "9bEpNrvK",
+      "source": "https://modrinth.com/mod/illager-invasion"
+    },
+    {
+      "file": "downloads/MutantMonsters-v21.1.1-1.21.1-NeoForge.jar",
+      "sha256": "1e20340a6642dcd6e43399292825f8cd84a079e0b917e36cf7341e787b626a4f",
+      "required": true,
+      "name": "Mutant Monsters",
+      "version": "v21.1.1-1.21.1-NeoForge",
+      "project_id": "derP0ten",
+      "version_id": "dauEcrnZ",
+      "source": "https://modrinth.com/mod/mutant-monsters"
+    },
+    {
+      "file": "downloads/DungeonsArise-1.21.1-2.1.68-release.jar",
+      "sha256": "7eee1eca7e3b2c6c1bede055934f391ae2e8349ffe33e106f451176d2cfcf0e4",
+      "required": true,
+      "name": "When Dungeons Arise",
+      "version": "2.1.68",
+      "project_id": "8DfbfASn",
+      "version_id": "XIRJSFQ0",
+      "source": "https://modrinth.com/mod/when-dungeons-arise"
+    },
+    {
+      "file": "downloads/jei-1.21.1-neoforge-19.51.0.418.jar",
+      "sha256": "8bc3936d869e4040a5649c58b7e8be1c78c82a245c0dc07bdd68ab49121a222c",
+      "required": true,
+      "name": "Just Enough Items (JEI)",
+      "version": "19.51.0.418",
+      "project_id": "u6dRKJwZ",
+      "version_id": "ufHUqt9b",
+      "source": "https://modrinth.com/mod/jei"
+    },
+    {
+      "file": "downloads/Jade-1.21.1-NeoForge-15.10.6.jar",
+      "sha256": "276f1f65a20d04f536989c4f311949d770b52c440c23c2b904a08860f3c93810",
+      "required": true,
+      "name": "Jade 🔍",
+      "version": "15.10.6+neoforge",
+      "project_id": "nvQzSEkH",
+      "version_id": "eYz2YBGT",
+      "source": "https://modrinth.com/mod/jade"
+    },
+    {
+      "file": "downloads/ferritecore-7.0.3-neoforge.jar",
+      "sha256": "d87ea28262715ebff45b8a82d493e6b468e7a4521bc021df5d88302196d030a8",
+      "required": true,
+      "name": "FerriteCore",
+      "version": "7.0.3-neoforge",
+      "project_id": "uXXizFIs",
+      "version_id": "x7kQWVju",
+      "source": "https://modrinth.com/mod/ferrite-core"
+    },
+    {
+      "file": "downloads/modernfix-neoforge-5.27.24+mc1.21.1.jar",
+      "sha256": "e6e9446890f0feb3aab3f6e73ae18cb17575c370f232179fef7baa30e61538fe",
+      "required": true,
+      "name": "ModernFix",
+      "version": "5.27.24+mc1.21.1",
+      "project_id": "nmDcB62a",
+      "version_id": "5HLHxQ2F",
+      "source": "https://modrinth.com/mod/modernfix"
+    },
+    {
+      "file": "downloads/sable-neoforge-1.21.1-2.0.5.jar",
+      "sha256": "c8710f85bc780bbf523e6726ceaaf76dd0b8c61479db497b382c6bb34317e7ab",
+      "required": true,
+      "name": "Sable",
+      "version": "2.0.5+mc1.21.1",
+      "project_id": "T9PomCSv",
+      "version_id": "U678xqle",
+      "source": "https://modrinth.com/mod/sable"
+    },
+    {
+      "file": "downloads/ntgl-1.21.1-3.2.0.jar",
+      "sha256": "38c3a93426c44195b7cdb0773b2d4554496bcc57f994f19779714e03b0bf0122",
+      "required": true,
+      "name": "[NTGL] NukaTeam's Gun Lib",
+      "version": "3.2.0",
+      "project_id": "5m2kV8xK",
+      "version_id": "zd7xJnqO",
+      "source": "https://modrinth.com/mod/ntgl"
+    },
+    {
+      "file": "downloads/PuzzlesLib-v21.1.60-mc1.21.1-NeoForge.jar",
+      "sha256": "179bcaafb812618834ba82e7f29b15eaee8894f74fb96152a51cfc22ad4f45c4",
+      "required": true,
+      "name": "Puzzles Lib",
+      "version": "21.1.60",
+      "project_id": "QAGBst4M",
+      "version_id": "lh44g7RC",
+      "source": "https://modrinth.com/mod/puzzles-lib"
+    },
+    {
+      "file": "downloads/geckolib-neoforge-1.21.1-4.9.3.jar",
+      "sha256": "20a1995e4074f387ff549e2c57ea79dd7d41ee83c6afb9dd6a6e840e592d1c47",
+      "required": true,
+      "name": "GeckoLib",
+      "version": "4.9.3",
+      "project_id": "8BmcQJ2H",
+      "version_id": "Grwn5rUB",
+      "source": "https://modrinth.com/mod/geckolib"
+    }
+  ]
+}
