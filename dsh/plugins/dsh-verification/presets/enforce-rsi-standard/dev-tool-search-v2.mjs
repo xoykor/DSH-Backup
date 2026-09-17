@@ -46,7 +46,7 @@ function toJsonSchema(spec) {
  * exists without a full catalog dump.
  */
 const UNLOCKABLE_INDEX = [
-  'web_search — internet search and web retrieval',
+  'web_search — internet search through the local SearXNG provider',
   'subagent / subagent_fork — delegate work to sub-agents',
   'workflow — run multi-agent workflow scripts',
   'ralph — fresh-agent iterative loop',
@@ -57,6 +57,10 @@ const UNLOCKABLE_INDEX = [
   'todo_write — task tracking',
   'ask_user_question — ask the user',
 ]
+
+const DISCOVERY_ALIASES = {
+  web_search: 'searxng local metasearch web internet search busca buscador pesquisa',
+}
 
 /** Register the model-facing `dev_tool_search` tool. */
 export function apply(ctx) {
@@ -108,7 +112,7 @@ export function apply(ctx) {
         const schemas = ctx.tools.schemas(exec?.agent)
         const wanted = query.toLowerCase().split(/[^a-z0-9_]+/).filter(Boolean)
         const all = schemas.filter((schema) => {
-          const haystack = `${schema.name} ${schema.description ?? ''}`.toLowerCase()
+          const haystack = `${schema.name} ${schema.description ?? ''} ${DISCOVERY_ALIASES[schema.name] ?? ''}`.toLowerCase()
           return wanted.every((token) => haystack.includes(token))
         })
         const matches = all.slice(0, MAX_RESULTS)

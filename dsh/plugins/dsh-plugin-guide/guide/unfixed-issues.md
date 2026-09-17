@@ -85,7 +85,6 @@
 | 本地模型把工具调用输出成 `<DSML|function_calls>` 文本 | 适配器只解析 `delta.tool_calls`，不解析文本标签；这是服务端职责 | `packages/llm/llm-deepseek/src/translate.ts:167-195` |
 | 自定义 provider 显示上下文 262k 而非 1M | 262144 是未声明容量时的内置默认假设，可 settings.yaml 覆盖 | `packages/llm/llm-pi-ai/src/config.ts:64,330`、`catalog.ts:901` |
 | 没填 key 却在扣 DeepSeek 余额 | 默认凭据引用环境变量 `DEEPSEEK_API_KEY`，启动环境只读且优先级最高 | `packages/llm/llm-deepseek/src/index.ts:88`；`packages/credentials/credentials-local/README.md:75-80` |
-| web_search 用 deepseek-v4-flash 而非会话模型 | 独立搜索 provider（web-search-deepseek），模型/凭据/端点与聊天分离 | `packages/web/web-search-deepseek/src/provider.ts:38,207-221` |
 | `dsh --profile tui` 不存在 | tui 非内置；README 中为示例（"assuming the tui profile is installed"），社区方案 `dsh plugin --profile tui add github:deepseek-harness/turtle-ui` | `apps/cli/README.md:28`、`apps/cli/reference/README.md:70-72` |
 | `--host 0.0.0.0` 被拒绝 | 刻意不支持（远程代码执行风险）；用 LAN IP + `--trusted-host` 或 SSH 隧道 | `packages/bundle/web-app/src/startup.ts:74-75` |
 | 工具定义每轮都发 | 无「每 N 轮」开关；工具集不变时前缀缓存复用（逻辑 prompt 体积 ≠ 全价计费） | `packages/core/agent-loop/src/agent.ts:262-265,556,613` |

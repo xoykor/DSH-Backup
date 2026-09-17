@@ -64,7 +64,9 @@ para ele.
 As ferramentas nativas expostas nesta sessão: `ask_user_question`, `bash`,
 `create_goal`, `edit`, `exit_plan_mode`, `get_goal`, `glob`, `grep`, `job_kill`,
 `job_list`, `job_output`, `read`, `skill`, `todo_write`, `update_goal`, `write`,
-`web_fetch`, `web_search`. Mapeiam-se aos bundles internos:
+`web_fetch`, `web_search`. A ferramenta `web_search` usa exclusivamente o provedor local
+SearXNG e pode ser descoberta no catálogo pelos termos `searxng`, `web`, `internet`,
+`busca`, `buscador` ou `pesquisa`. As ferramentas mapeiam-se aos bundles internos:
 `dsh-tool-bash/pwsh/fs/goal/jobs/skill/todo/subagent/workflow/web/ask-user/fs-search/present`.
 
 ### 1.5 Skills (mecanismo)

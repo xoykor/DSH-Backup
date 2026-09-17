@@ -46,19 +46,10 @@
   config:
     path: __DSH_HOME__/profiles/robust-local/settings.yaml
 
-- id: web
-  config:
-    searchProvider: searxng
-
 - id: goal
   disabled: true
 
 - insert:
-    - id: web-search-searxng
-      name: __DSH_HOME__/plugins/dsh-web-search-searxng/index.mjs
-      config:
-        baseURL: http://127.0.0.1:8888
-
     - id: goal-verified
       name: __DSH_HOME__/plugins/dsh-goal-verification/lib/index.js
       config:

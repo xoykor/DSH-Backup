@@ -26,4 +26,18 @@ export function apply(ctx, config = {}) {
     }
   }
   ctx.web.registerSearchProvider(provider)
+
+  // Make the selected backend visible to every agent without changing the
+  // stable model-facing tool name owned by dsh-tool-web.
+  ctx.inject(['systemPrompt'], (promptCtx) => {
+    promptCtx.systemPrompt.section({
+      name: 'web-search-searxng:discovery',
+      order: 220,
+      text: [
+        'Web search is provided exclusively by the local SearXNG instance.',
+        'Use the `web_search` tool for internet search; its configured backend is SearXNG.',
+        'If tools are hidden behind discovery, search for `searxng`, `web`, or `internet`, then unlock `web_search`.',
+      ].join(' '),
+    })
+  })
 }

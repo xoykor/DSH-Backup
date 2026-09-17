@@ -44,9 +44,18 @@
   config:
     thresholds: [3, 5]
     argumentsPreviewChars: 500
+- id: web
+  config:
+    searchProvider: searxng
+- id: web-search-deepseek
+  disabled: true
 - insert:
     - id: qwen-request-defaults
       name: __DSH_HOME__/plugins/dsh-qwen-defaults/lib/index.js
+    - id: web-search-searxng
+      name: __DSH_HOME__/plugins/dsh-web-search-searxng/index.mjs
+      config:
+        baseURL: http://127.0.0.1:8888
 
 # Explicit local robust defaults for every host loading context-guard.
 - id: context-guard
