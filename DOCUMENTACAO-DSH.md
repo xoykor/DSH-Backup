@@ -97,14 +97,18 @@ usuário e `disable-model-invocation: true` bloqueiam invocação automática (e
 ### 1.6 Ciclo de contexto / Context Guard (loop-safety)
 
 Para sessões de modelo local há um **guardião de contexto** persistente que mede
-tokens estimados e impõe limites duradouros por turno:
+tokens estimados e impõe limites duradouros por turno. A janela e os limiares
+efetivos são derivados em tempo de execução a partir do preset selecionado e
+dos ratios definidos nos sliders. O aviso `ACTIVE CONTEXT POLICY` e o medidor
+nativo são a referência da sessão; números fixos nesta documentação não devem
+ser usados para inferir o orçamento ativo.
 
-- < 65536 tokens — operação normal.
-- 65536–81920 (economia): leituras direcionadas, resultados concisos, diffs.
-- 81920–94371 (preparar checkpoint): preservar objetivo, restrições, trabalho feito,
+- abaixo do limiar de economia — operação normal;
+- entre economia e checkpoint — leituras direcionadas, resultados concisos e diffs;
+- entre checkpoint e compactação — preservar objetivo, restrições, trabalho feito,
   decisões, arquivos mudados, comandos/resultados relevantes, erros abertos, estado
-  atual e **um próximo passo**.
-- ≥ 94371: compactação automática (janela 131072, thresholdRatio 0.72).
+  atual e **um próximo passo**;
+- no limiar de compactação — salvar o estado e compactar conforme a política ativa.
 
 No perfil Web, o plugin `dsh-context-guard` também registra a seção **Contexto e
 compactação** nas configurações. Os sliders editam uma única política por preset:

@@ -577,6 +577,7 @@ function createState() {
     economyNoticed: false,
     checkpointNoticed: false,
     compactNoticed: false,
+    activeContextNoticed: false,
     immediateCompactionPending: false,
     immediateCompactionPromise: undefined,
     compactionController: undefined,
@@ -754,6 +755,7 @@ export function apply(ctx, rawConfig = {}) {
     state.economyNoticed = false;
     state.checkpointNoticed = false;
     state.compactNoticed = false;
+    state.activeContextNoticed = false;
   };
 
   const stopTurn = (agent, state, reason, mode = 'stopped') => {
@@ -817,6 +819,7 @@ export function apply(ctx, rawConfig = {}) {
         state.mode = 'normal';
         state.stopReason = '';
         state.economyNoticed = state.checkpointNoticed = state.compactNoticed = false;
+        state.activeContextNoticed = false;
         state.turnActive = false;
         agent.steer(notice(
           'CONTEXT-GUARD: context pressure paused the previous step; its state summary was saved before compaction. '
@@ -1335,6 +1338,21 @@ export function apply(ctx, rawConfig = {}) {
     const totalTokens = readTokenTotal(agent);
     const tokenUsage = updateTokenUsage(state, agent);
     const injected = [];
+
+    if (!state.activeContextNoticed && state.config.contextWindow !== undefined) {
+      state.activeContextNoticed = true;
+      injected.push(notice(
+        'ACTIVE CONTEXT POLICY: this preset currently has an effective context window of '
+          + state.config.contextWindow + ' tokens. Economy starts at '
+          + state.config.economyTokens + ', checkpoint preparation at '
+          + state.config.checkpointTokens + ', and automatic compaction at '
+          + state.config.compactTokens + ' tokens. These values come from the '
+          + 'active sliders/settings and override the model capacity or any static '
+          + 'documentation. Use this policy for planning and never substitute a '
+          + 'different model-capacity number.',
+        'active context policy (~' + state.config.contextWindow + ' tokens)',
+      ));
+    }
 
     if (state.mode === 'diagnostic' && !state.diagnosticNoticeIssued && state.timeoutRecord) {
       state.diagnosticNoticeIssued = true;

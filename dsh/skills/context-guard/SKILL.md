@@ -9,10 +9,17 @@ user-invocable: false
 
 This skill is automatically active with the DSH context guard. Follow its budget notices and deterministic tool blocks.
 
-- Normal operation below 65536 estimated tokens.
-- Economy mode from 65536 to 81920: use targeted reads, concise results, and diffs.
-- Checkpoint preparation from 81920 to 91750: preserve the live objective, constraints, work completed, decisions, changed files, relevant commands/results, unresolved errors, failed approaches, current state, and one next action.
-- Pause → state summary → persistence → compaction begins at 91750 estimated tokens for the local robust policy (thresholdRatio 0.70 with a 131072-token window).
+The effective context window and every dependent threshold are runtime values for
+the selected preset. Read the first `ACTIVE CONTEXT POLICY` notice and the native
+context meter as the source of truth. The sliders/settings derive the economy,
+checkpoint, compaction, response, summary, safety and retention values from the
+configured ratios. Never replace an active value with a number remembered from a
+model capacity, another preset, or this document.
+
+- Normal operation is below the active economy threshold.
+- Economy mode runs from the active economy threshold to the active checkpoint threshold: use targeted reads, concise results, and diffs.
+- Checkpoint preparation runs from the active checkpoint threshold to the active compaction threshold: preserve the live objective, constraints, work completed, decisions, changed files, relevant commands/results, unresolved errors, failed approaches, current state, and one next action.
+- Pause → state summary → persistence → compaction begins at the active compaction threshold for the active context window.
 
 When the threshold is reached, the executor pauses normal work, waits for the interrupted turn to settle, asks the session model for a text-only state summary of the full balanced durable history (including the latest work), flushes that summary to storage, then replaces the history and resumes. No tools execute during the summary. Preserve job IDs, artifact/log paths, uncertain side effects, failed attempts and one next action. The executor prices the summary input plus instructions and schemas, reduces its output cap if necessary, and requires input + output cap + safety margin < context capacity. A missing, truncated, failed or unsaved summary never authorizes history replacement. Compaction does not reset logical execution budgets or anti-loop evidence. Summary output reserve: 8192 tokens (including model reasoning); safety reserve: 4096 tokens.
 

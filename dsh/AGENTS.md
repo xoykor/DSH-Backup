@@ -9,9 +9,11 @@ errors as evidence.
 
 This policy is always active for DSH sessions, especially local models such as Qwen 3.5 9B. The harness independently measures context and blocks repeated tool loops; comply with its notices immediately.
 
-For Local Robust 27B (Qwen 3.8 27B, 64000-token window), use economy at 32000 tokens, checkpoint at 40000 and pause for summary at 44800. Its preset-local `context-guard` skill supplies the matching policy. These values override the 9B/default ranges in the following paragraph only for that preset.
-
-For Local Robust 9B (Ornith, 131072-token context), use context deliberately. Below 65536 tokens, work normally. At 65536–81920, prefer relevant excerpts, bounded output, diffs, and the most recent useful result. Do not reread unchanged files or repeat an already-conclusive command. At 81920–91750, prepare for a compact checkpoint: preserve the objective, user requirements, completed work, decisions, modified files, important changes, relevant commands and results, unresolved errors, failed attempts, current project state, and exactly one next action. At 91750, pause for a saved state summary before compaction. Other presets keep their configured policies.
+Context limits and thresholds are runtime-configured per preset by the active
+`context-guard` settings. Treat its explicit notices and the native context
+meter as authoritative for the current session; do not infer a window or a
+compaction threshold from static documentation in this file. Sliders may change
+the effective values without changing this document.
 
 When the threshold is reached, the executor pauses normal work, waits for the interrupted turn to settle, asks the session model for a text-only state summary of the full balanced durable history (including the latest work), flushes that summary to storage, then replaces the history and resumes. No tools execute during the summary. Preserve job IDs, artifact/log paths, uncertain side effects, failed attempts and one next action. The executor prices the summary input plus instructions and schemas, reduces its output cap if necessary, and requires input + output cap + safety margin < context capacity. A missing, truncated, failed or unsaved summary never authorizes history replacement. Compaction does not reset logical execution budgets or anti-loop evidence.
 

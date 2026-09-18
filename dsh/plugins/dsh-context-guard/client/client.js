@@ -222,7 +222,7 @@
           jsx('div', { className: 'dshcg-context-note' },
             jsx('strong', null, `Guardião ativo: ${tokens(guardWindow)}`),
             jsx('span', null, `checkpoint em ${tokens(checkpointAt)} e compactação em ${tokens(compactAt)} (${percent(draft.compactRatio)}).`),
-            jsx('span', null, 'O medidor nativo do DSH pode continuar mostrando 131K: ele representa a capacidade máxima do modelo, não o orçamento efetivo deste guardião.'),
+            jsx('span', null, 'O medidor nativo mostra a janela efetiva do preset ativo. A capacidade física do modelo pode ser diferente; os sliders controlam o orçamento deste guardião.'),
           ),
           jsx('div', { className: 'dshcg-grid' }, RATIO_FIELDS.map(([field, label]) => jsx(SliderRow, {
             key: field,
