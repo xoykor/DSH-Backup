@@ -12,8 +12,8 @@ importers:
         specifier: file:./.dsh-artifacts/dsh-context-guard/1.0.0
         version: file:.dsh-artifacts/dsh-context-guard/1.0.0(@deepseek-ai/schemastery@3.18.2)
       dsh-memory:
-        specifier: https://github.com/xoykor/DSH-memory/releases/download/v0.7.0/dsh-memory-0.7.0.tgz
-        version: https://github.com/xoykor/DSH-memory/releases/download/v0.7.0/dsh-memory-0.7.0.tgz
+        specifier: https://github.com/xoykor/DSH-memory/releases/download/v0.7.1/dsh-memory-0.7.1.tgz
+        version: https://github.com/xoykor/DSH-memory/releases/download/v0.7.1/dsh-memory-0.7.1.tgz
 
 packages:
 
@@ -39,14 +39,10 @@ packages:
       '@deepseek-ai/dsh-client-ui-settings':
         optional: true
 
-  dsh-memory@https://github.com/xoykor/DSH-memory/releases/download/v0.7.0/dsh-memory-0.7.0.tgz:
-    resolution: {integrity: sha512-2rLbmqGPeP3At/xrAxYwrhbRzjcKn43Ate3BaxGE2mLFoI9J5lMyJtiLQpVwTWz8dvESxX3S/x8U3qlKDMd6Gg==, tarball: https://github.com/xoykor/DSH-memory/releases/download/v0.7.0/dsh-memory-0.7.0.tgz}
-    version: 0.7.0
+  dsh-memory@https://github.com/xoykor/DSH-memory/releases/download/v0.7.1/dsh-memory-0.7.1.tgz:
+    resolution: {integrity: sha512-pjQF9ZRxih3U4KhIOJ42nUZX3JFgPIeEpmgkbJsibrOepX29HzYX1Z7JssFn1gFjl71yTmvloHriKsH1IPKC3Q==, tarball: https://github.com/xoykor/DSH-memory/releases/download/v0.7.1/dsh-memory-0.7.1.tgz}
+    version: 0.7.1
     engines: {node: ^22.19.0 || >=24.0.0}
-    peerDependencies:
-      '@deepseek-ai/cordis': ^4.0.1
-      '@deepseek-ai/dsh-system-prompt': ^0.1.0-rc.6
-      '@deepseek-ai/dsh-tools': ^0.1.0-rc.6
 
 snapshots:
 
@@ -63,6 +59,6 @@ snapshots:
     dependencies:
       '@deepseek-ai/schemastery': 3.18.2
 
-  dsh-memory@https://github.com/xoykor/DSH-memory/releases/download/v0.7.0/dsh-memory-0.7.0.tgz:
+  dsh-memory@https://github.com/xoykor/DSH-memory/releases/download/v0.7.1/dsh-memory-0.7.1.tgz:
     dependencies:
       '@deepseek-ai/schemastery': 3.18.2
