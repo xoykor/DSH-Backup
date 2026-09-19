@@ -450,7 +450,7 @@ install_desktop_launcher() {
 Type=Application
 Name=DeepSeek Harness
 Comment=DeepSeek Harness Web Interface
-Exec=$DSH_INSTALL_PREFIX/bin/dsh --profile robust-local
+Exec=$DSH_INSTALL_PREFIX/bin/dsh web
 Icon=deepseek-harness
 Terminal=false
 Categories=Development;Utility;
