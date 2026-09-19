@@ -1,0 +1,61 @@
+name: Install DSH-memory into robust-local
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/install-dsh-memory.yml
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install pinned pnpm
+        run: npm install -g pnpm@11.26.0
+
+      - name: Add DSH-memory v0.7.0 to robust-local
+        working-directory: dsh/profiles/robust-local
+        run: |
+          pnpm add https://github.com/xoykor/DSH-memory/releases/download/v0.7.0/dsh-memory-0.7.0.tgz
+
+          node <<'NODE'
+          const fs = require('node:fs')
+          const path = 'package.json'
+          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'))
+          const bundles = pkg.dsh?.profile?.bundles
+          if (!Array.isArray(bundles)) throw new Error('dsh.profile.bundles is missing')
+          if (!bundles.includes('dsh-memory')) bundles.push('dsh-memory')
+          fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n')
+          NODE
+
+          pnpm install --frozen-lockfile
+
+      - name: Verify installed package contents
+        working-directory: dsh/profiles/robust-local
+        run: |
+          test -f node_modules/dsh-memory/lib/index.js
+          test -f node_modules/dsh-memory/cordis.patch.yml
+          node -e "const p=require('./node_modules/dsh-memory/package.json'); if(p.version!=='0.7.0') process.exit(1)"
+
+      - name: Commit backup integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dsh/profiles/robust-local/package.json dsh/profiles/robust-local/pnpm-lock.yaml
+          if git diff --cached --quiet; then
+            echo "DSH-memory already installed."
+            exit 0
+          fi
+          git commit -m "Install DSH-memory v0.7.0 in robust-local"
+          git push origin master
