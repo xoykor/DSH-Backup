@@ -10,18 +10,27 @@ importers:
     dependencies:
       dsh-context-guard:
         specifier: file:__DSH_HOME__/plugins/dsh-context-guard
-        version: file:../../plugins/dsh-context-guard
+        version: file:../../plugins/dsh-context-guard(@deepseek-ai/schemastery@3.18.2)
       dsh-continue-button:
         specifier: link:__DSH_HOME__/plugins/dsh-continue-button
-        version: link:../../plugins/dsh-continue-button
+        version: link:__DSH_HOME__/plugins/dsh-continue-button
       dsh-global-token-meter:
         specifier: link:__DSH_HOME__/plugins/dsh-global-token-meter
-        version: link:../../plugins/dsh-global-token-meter
+        version: link:__DSH_HOME__/plugins/dsh-global-token-meter
+      dsh-memory:
+        specifier: https://github.com/xoykor/DSH-memory/releases/download/v0.7.1/dsh-memory-0.7.1.tgz
+        version: https://github.com/xoykor/DSH-memory/releases/download/v0.7.1/dsh-memory-0.7.1.tgz
       relay-dsh-plugin-codex:
         specifier: 0.2.2
         version: 0.2.2
 
 packages:
+
+  '@deepseek-ai/cosmokit@1.8.3':
+    resolution: {integrity: sha512-qBo+ronVM6Eu2WNVJXi8JcMiqZ19T9BRIpV+5qJUFPXjGH/Z0QKcQMC/IZJ7L394YTOtJgcovbk9qP0w2GsBXQ==}
+
+  '@deepseek-ai/schemastery@3.18.2':
+    resolution: {integrity: sha512-njDtZsznjYxok7KLLlHOPyuv2efdWVbSflAHgztSfbMsg+CVraEoRe2DjOCgClYv3ZCSm7WXoaUkbB/+RY7tWQ==}
 
   '@openai/codex@0.149.0':
     resolution: {integrity: sha512-i4dryj2Y1j+00Mb5n+0n71EYnTK9/KDc2cdFo/dXD0d1oTog2bhUssKDEIOnKmnEf51P0Z/HJTWvTKw/UHyOvQ==}
@@ -64,8 +73,26 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@standard-schema/spec@1.1.0':
+    resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
   dsh-context-guard@file:../../plugins/dsh-context-guard:
     resolution: {directory: ../../plugins/dsh-context-guard, type: directory}
+    peerDependencies:
+      '@deepseek-ai/dsh-client-locale': ^0.1.5-rc.2
+      '@deepseek-ai/dsh-client-ui-settings': ^0.1.5-rc.2
+      '@deepseek-ai/dsh-settings': ^0.1.5-rc.2
+      '@deepseek-ai/schemastery': ^3.18.2
+    peerDependenciesMeta:
+      '@deepseek-ai/dsh-client-locale':
+        optional: true
+      '@deepseek-ai/dsh-client-ui-settings':
+        optional: true
+
+  dsh-memory@https://github.com/xoykor/DSH-memory/releases/download/v0.7.1/dsh-memory-0.7.1.tgz:
+    resolution: {integrity: sha512-pjQF9ZRxih3U4KhIOJ42nUZX3JFgPIeEpmgkbJsibrOepX29HzYX1Z7JssFn1gFjl71yTmvloHriKsH1IPKC3Q==, tarball: https://github.com/xoykor/DSH-memory/releases/download/v0.7.1/dsh-memory-0.7.1.tgz}
+    version: 0.7.1
+    engines: {node: ^22.19.0 || >=24.0.0}
 
   lucide-react@1.42.0:
     resolution: {integrity: sha512-b3jprplnoLS8n5etw1z8xODe3hF/yjKATrTitsrKrnjUhCef5BdDct6Ppv3zVvzFwmtfWgLO6XNM3C9fAD93ug==}
@@ -101,6 +128,13 @@ packages:
 
 snapshots:
 
+  '@deepseek-ai/cosmokit@1.8.3': {}
+
+  '@deepseek-ai/schemastery@3.18.2':
+    dependencies:
+      '@deepseek-ai/cosmokit': 1.8.3
+      '@standard-schema/spec': 1.1.0
+
   '@openai/codex@0.149.0':
     optionalDependencies:
       '@openai/codex-darwin-arm64': '@openai/codex@0.149.0-darwin-arm64'
@@ -128,7 +162,15 @@ snapshots:
   '@openai/codex@0.149.0-win32-x64':
     optional: true
 
-  dsh-context-guard@file:../../plugins/dsh-context-guard: {}
+  '@standard-schema/spec@1.1.0': {}
+
+  dsh-context-guard@file:../../plugins/dsh-context-guard(@deepseek-ai/schemastery@3.18.2):
+    dependencies:
+      '@deepseek-ai/schemastery': 3.18.2
+
+  dsh-memory@https://github.com/xoykor/DSH-memory/releases/download/v0.7.1/dsh-memory-0.7.1.tgz:
+    dependencies:
+      '@deepseek-ai/schemastery': 3.18.2
 
   lucide-react@1.42.0: {}
 
