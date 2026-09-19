@@ -1,7 +1,7 @@
 lockfileVersion: '9.0'
 
 settings:
-  autoInstallPeers: true
+  autoInstallPeers: false
   excludeLinksFromLockfile: false
 
 importers:
@@ -10,13 +10,59 @@ importers:
     dependencies:
       dsh-context-guard:
         specifier: file:./.dsh-artifacts/dsh-context-guard/1.0.0
-        version: file:.dsh-artifacts/dsh-context-guard/1.0.0
+        version: file:.dsh-artifacts/dsh-context-guard/1.0.0(@deepseek-ai/schemastery@3.18.2)
+      dsh-memory:
+        specifier: https://github.com/xoykor/DSH-memory/releases/download/v0.7.0/dsh-memory-0.7.0.tgz
+        version: https://github.com/xoykor/DSH-memory/releases/download/v0.7.0/dsh-memory-0.7.0.tgz
 
 packages:
 
+  '@deepseek-ai/cosmokit@1.8.3':
+    resolution: {integrity: sha512-qBo+ronVM6Eu2WNVJXi8JcMiqZ19T9BRIpV+5qJUFPXjGH/Z0QKcQMC/IZJ7L394YTOtJgcovbk9qP0w2GsBXQ==}
+
+  '@deepseek-ai/schemastery@3.18.2':
+    resolution: {integrity: sha512-njDtZsznjYxok7KLLlHOPyuv2efdWVbSflAHgztSfbMsg+CVraEoRe2DjOCgClYv3ZCSm7WXoaUkbB/+RY7tWQ==}
+
+  '@standard-schema/spec@1.1.0':
+    resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
   dsh-context-guard@file:.dsh-artifacts/dsh-context-guard/1.0.0:
     resolution: {directory: .dsh-artifacts/dsh-context-guard/1.0.0, type: directory}
+    peerDependencies:
+      '@deepseek-ai/dsh-client-locale': ^0.1.5-rc.2
+      '@deepseek-ai/dsh-client-ui-settings': ^0.1.5-rc.2
+      '@deepseek-ai/dsh-settings': ^0.1.5-rc.2
+      '@deepseek-ai/schemastery': ^3.18.2
+    peerDependenciesMeta:
+      '@deepseek-ai/dsh-client-locale':
+        optional: true
+      '@deepseek-ai/dsh-client-ui-settings':
+        optional: true
+
+  dsh-memory@https://github.com/xoykor/DSH-memory/releases/download/v0.7.0/dsh-memory-0.7.0.tgz:
+    resolution: {integrity: sha512-2rLbmqGPeP3At/xrAxYwrhbRzjcKn43Ate3BaxGE2mLFoI9J5lMyJtiLQpVwTWz8dvESxX3S/x8U3qlKDMd6Gg==, tarball: https://github.com/xoykor/DSH-memory/releases/download/v0.7.0/dsh-memory-0.7.0.tgz}
+    version: 0.7.0
+    engines: {node: ^22.19.0 || >=24.0.0}
+    peerDependencies:
+      '@deepseek-ai/cordis': ^4.0.1
+      '@deepseek-ai/dsh-system-prompt': ^0.1.0-rc.6
+      '@deepseek-ai/dsh-tools': ^0.1.0-rc.6
 
 snapshots:
 
-  dsh-context-guard@file:.dsh-artifacts/dsh-context-guard/1.0.0: {}
+  '@deepseek-ai/cosmokit@1.8.3': {}
+
+  '@deepseek-ai/schemastery@3.18.2':
+    dependencies:
+      '@deepseek-ai/cosmokit': 1.8.3
+      '@standard-schema/spec': 1.1.0
+
+  '@standard-schema/spec@1.1.0': {}
+
+  dsh-context-guard@file:.dsh-artifacts/dsh-context-guard/1.0.0(@deepseek-ai/schemastery@3.18.2):
+    dependencies:
+      '@deepseek-ai/schemastery': 3.18.2
+
+  dsh-memory@https://github.com/xoykor/DSH-memory/releases/download/v0.7.0/dsh-memory-0.7.0.tgz:
+    dependencies:
+      '@deepseek-ai/schemastery': 3.18.2
