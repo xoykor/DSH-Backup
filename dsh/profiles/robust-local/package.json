@@ -3,7 +3,7 @@
   "private": true,
   "dependencies": {
     "dsh-context-guard": "file:./.dsh-artifacts/dsh-context-guard/1.0.0",
-    "dsh-memory": "https://github.com/xoykor/DSH-memory/releases/download/v0.7.0/dsh-memory-0.7.0.tgz"
+    "dsh-memory": "https://github.com/xoykor/DSH-memory/releases/download/v0.7.1/dsh-memory-0.7.1.tgz"
   },
   "dsh": {
     "profile": {
