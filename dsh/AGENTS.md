@@ -27,6 +27,25 @@ Managed background work uses `job_output` with the recorded `job_id`, `wait: tru
 
 When compacting or reporting state, retain exact paths, commands, error messages, identifiers, constraints, decisions, failed approaches, and the next concrete action. Discard stale terminal output, duplicated reasoning, and superseded plans.
 
+## Durable memory
+
+`dsh-memory` is the persistent cross-session memory layer for this environment.
+
+Its injected memory policy is authoritative for memory tool usage. Use
+`memory_search` when relevant prior-session information may matter and is not
+already recalled, `memory_write` for newly learned durable facts likely to
+matter in future sessions, and `memory_update` when an existing durable fact
+changes.
+
+Prefer canonical keys for facts that should have one current value. Do not store
+transient task state, logs, secrets, intermediate results or information easily
+recovered from the repository.
+
+Do not create a separate ad-hoc memory system when `dsh-memory` can represent
+the information. `memory_review` and `memory_stats` are maintenance and
+diagnostic tools; do not call them routinely when the task does not require
+memory curation.
+
 ## PTC `run_code` source-safety policy
 
 When using the TypeScript `run_code` tool, the `code` and `description` arguments are JSON string values. Keep the outer tool-call payload valid JSON, and make the program itself valid erasable TypeScript. Do not place raw multiline or quote-heavy file content in a double-quoted TypeScript string.
