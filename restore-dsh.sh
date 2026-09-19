@@ -450,7 +450,7 @@ install_desktop_launcher() {
 Type=Application
 Name=DeepSeek Harness
 Comment=DeepSeek Harness Web Interface
-Exec=$DSH_INSTALL_PREFIX/bin/dsh web
+Exec=$DSH_INSTALL_PREFIX/bin/dsh --profile robust-local
 Icon=deepseek-harness
 Terminal=false
 Categories=Development;Utility;
@@ -518,6 +518,43 @@ restore_profiles() {
   done < <(find "$DSH_HOME/profiles" -mindepth 1 -maxdepth 1 -type d -print0)
 }
 
+verify_memory_bundle() {
+  local profile_dir="$DSH_HOME/profiles/robust-local"
+  local package_json="$profile_dir/package.json"
+  local installed_package="$profile_dir/node_modules/dsh-memory/package.json"
+  local out
+
+  [[ -f "$package_json" ]] || die "robust-local package.json is missing"
+  [[ -f "$installed_package" ]] || die "dsh-memory is not installed in robust-local"
+
+  node - "$package_json" "$installed_package" <<'NODE'
+const fs = require('node:fs');
+const [profilePath, installedPath] = process.argv.slice(2);
+const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+const installed = JSON.parse(fs.readFileSync(installedPath, 'utf8'));
+
+if (installed.version !== '0.7.1') {
+  throw new Error(`expected dsh-memory 0.7.1, found ${installed.version ?? 'unknown'}`);
+}
+if (!profile.dsh?.profile?.bundles?.includes('dsh-memory')) {
+  throw new Error('robust-local does not activate the dsh-memory bundle');
+}
+NODE
+
+  (
+    cd -- "$profile_dir"
+    node --input-type=module -e "import('dsh-memory').then(() => process.stdout.write('dsh-memory import OK\n'))"
+  )
+
+  out="$(mktemp)"
+  "$DSH_BIN" --profile robust-local --dump-config > "$out" 2>&1
+  grep -q -- "id: memory" "$out"     || { tail -n 80 "$out" >&2 || true; rm -f -- "$out"; die "robust-local composed config has no memory row"; }
+  grep -q -- "name: dsh-memory" "$out"     || { tail -n 80 "$out" >&2 || true; rm -f -- "$out"; die "robust-local memory row does not load dsh-memory"; }
+  rm -f -- "$out"
+
+  log "robust-local: dsh-memory v0.7.1 installed and composed"
+}
+
 restore_plugins() {
   local plugin has_deps
   while IFS= read -r -d '' plugin; do
@@ -579,6 +616,7 @@ verify_current() {
   runtime_compaction_progress_patch --check
   runtime_local_http_timeout_patch --check
   verify_saved_paths
+  verify_memory_bundle
   log "verification complete"
 }
 
@@ -630,6 +668,7 @@ restore_current() {
   restore_profiles
   install_desktop_launcher
   verify_saved_paths
+  verify_memory_bundle
   log "restore complete"
   log "managed paths were backed up at $RESTORE_BACKUP_ROOT"
   log "authenticate again and configure external model/API secrets before use"
