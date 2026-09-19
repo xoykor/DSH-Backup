@@ -519,40 +519,45 @@ restore_profiles() {
 }
 
 verify_memory_bundle() {
-  local profile_dir="$DSH_HOME/profiles/robust-local"
-  local package_json="$profile_dir/package.json"
-  local installed_package="$profile_dir/node_modules/dsh-memory/package.json"
-  local out
+  local profile profile_dir package_json installed_package out
 
-  [[ -f "$package_json" ]] || die "robust-local package.json is missing"
-  [[ -f "$installed_package" ]] || die "dsh-memory is not installed in robust-local"
+  for profile in web robust-local; do
+    profile_dir="$DSH_HOME/profiles/$profile"
+    package_json="$profile_dir/package.json"
+    installed_package="$profile_dir/node_modules/dsh-memory/package.json"
 
-  node - "$package_json" "$installed_package" <<'NODE'
+    [[ -f "$package_json" ]] || die "$profile package.json is missing"
+    [[ -f "$installed_package" ]] || die "dsh-memory is not installed in $profile"
+
+    node - "$profile" "$package_json" "$installed_package" <<'NODE'
 const fs = require('node:fs');
-const [profilePath, installedPath] = process.argv.slice(2);
+const [profileName, profilePath, installedPath] = process.argv.slice(2);
 const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
 const installed = JSON.parse(fs.readFileSync(installedPath, 'utf8'));
 
 if (installed.version !== '0.7.1') {
-  throw new Error(`expected dsh-memory 0.7.1, found ${installed.version ?? 'unknown'}`);
+  throw new Error(`expected dsh-memory 0.7.1 in ${profileName}, found ${installed.version ?? 'unknown'}`);
 }
 if (!profile.dsh?.profile?.bundles?.includes('dsh-memory')) {
-  throw new Error('robust-local does not activate the dsh-memory bundle');
+  throw new Error(`${profileName} does not activate the dsh-memory bundle`);
 }
 NODE
 
-  (
-    cd -- "$profile_dir"
-    node --input-type=module -e "import('dsh-memory').then(() => process.stdout.write('dsh-memory import OK\n'))"
-  )
+    (
+      cd -- "$profile_dir"
+      node --input-type=module -e "import('dsh-memory').then(() => process.stdout.write('dsh-memory import OK\n'))"
+    )
 
-  out="$(mktemp)"
-  "$DSH_BIN" --profile robust-local --dump-config > "$out" 2>&1
-  grep -q -- "id: memory" "$out"     || { tail -n 80 "$out" >&2 || true; rm -f -- "$out"; die "robust-local composed config has no memory row"; }
-  grep -q -- "name: dsh-memory" "$out"     || { tail -n 80 "$out" >&2 || true; rm -f -- "$out"; die "robust-local memory row does not load dsh-memory"; }
-  rm -f -- "$out"
+    out="$(mktemp)"
+    "$DSH_BIN" --profile "$profile" --dump-config > "$out" 2>&1
+    grep -q -- "id: memory" "$out" \
+      || { tail -n 80 "$out" >&2 || true; rm -f -- "$out"; die "$profile composed config has no memory row"; }
+    grep -q -- "name: dsh-memory" "$out" \
+      || { tail -n 80 "$out" >&2 || true; rm -f -- "$out"; die "$profile memory row does not load dsh-memory"; }
+    rm -f -- "$out"
 
-  log "robust-local: dsh-memory v0.7.1 installed and composed"
+    log "$profile: dsh-memory v0.7.1 installed and composed"
+  done
 }
 
 restore_plugins() {
