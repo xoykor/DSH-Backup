@@ -160,17 +160,6 @@
     # service-id collision with context-guard.
     - id: dsh-library
 
-    # dsh-memento v0.5.12: frozen memory snapshot + recall tools (memory seam).
-    # Prebuilt bundle (main ./index.mjs); no build step. Ships NO local node_modules;
-    # 4 runtime @deepseek-ai/* imports (dsh-tools, schemastery, dsh-session,
-    # dsh-settings) symlinked into a plugin-local node_modules so bare resolution
-    # works like the other plugins (deps confirmed present in shared store). Import
-    # smoke LOADED_OK inject:[tools, systemPrompt, approval]. Declares systemPrompt
-    # injection but references no service-id collision with context-guard. No
-    # dsh-auto-review / dsh-background-agents; host-only (no client bundle).
-    - id: memento
-      name: __DSH_HOME__/plugins/dsh-memento/index.mjs
-
     # dsh-checkpoint-rewind v0.6.11: checkpoint/rewind seam (/checkpoint, /rewind).
     # Prebuilt bundle (main ./index.mjs); no build step. Ships NO local node_modules;
     # 241 @deepseek-ai/* + top-level zod symlinked into a plugin-local node_modules
