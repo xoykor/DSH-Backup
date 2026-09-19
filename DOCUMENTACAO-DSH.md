@@ -1,238 +1,868 @@
-# Documentação do DSH — Arquitetura, Skills e Limitações
+# Arquitetura Técnica do DSH-Backup
 
-Repositório de backup das configurações **live** do DeepSeek Harness (`@deepseek-ai/dsh`
-0.1.5-rc.2) + Codex. Este arquivo responde a quatro perguntas:
+Este documento descreve a arquitetura técnica versionada em
+`xoykor/DSH-Backup`. Ele complementa `INSTALACAO.md`: enquanto aquele arquivo
+foca no layout e restauração da instalação, este explica o comportamento do
+harness, as camadas de controle do agente e os patches locais do runtime.
 
-1. **Como funciona o DSH?** (arquitetura, perfis, ferramentas, ciclo de contexto)
-2. **Quais skills estão implementadas e o que cada uma faz** (+ como funcionam)
-3. **Quais limitações foram encontradas** no runtime desta sessão
-4. **A instalação live tem backup em `/home/x/Documentos/DSH/` → GitHub?** (confirmação)
+O snapshot atual é baseado em:
 
-> **Autoridade:** a instalação live (`~/.dsh`, `~/.codex`) é a fonte da verdade.
-> Este repositório espelha o live, aplicando normalização de caminhos e excluindo
-> segredos/sessões/cache. Ver também [`INSTALACAO.md`](./INSTALACAO.md) (instalação)
-> e [`README.md`](./README.md) (restauração).
+- `@deepseek-ai/dsh@0.1.5-rc.2`;
+- Node `>=22`;
+- pnpm `11.26.0`;
+- LM Studio como backend local principal;
+- Ornith 1.5 9B como modelo local padrão do profile robusto.
 
 ---
 
-## 1. Como funciona o DSH
+## 1. Visão geral
 
-### 1.1 Visão geral
+O repositório deixou de ser apenas uma cópia de arquivos de configuração. Ele
+versiona uma camada própria de comportamento sobre o DSH:
 
-O `dsh` é um **harness de agente** escrito em TypeScript como monorepo pnpm com
-~150 pacotes sob `@deepseek-ai/`. O comando `dsh` é o único launcher Node suportado:
-perfis são **empilhamentos ordenados de camadas de patch de bundles de plugins**,
-sobrepostos às overrides do próprio usuário. Não há bins públicos separados para SDK
-ou ACP — eles são perfis (`sdk`, `sdk-minimal`, `acp`), não comandos distintos.
-
-Fonte: [`@deepseek-ai/dsh/README.md`](../../packages/dsh/README.md) (checkout local).
-
-### 1.2 Perfis e composição da árvore de patches
-
-Um diretório de perfil contém:
-- `package.json` — dependências de plugins fora da árvore + manifest `dsh.profile`
-  (lista ordenada `bundles` + ciclo de vida `patchReload`)
-- `cordis.patch.yml` — camada de patch do próprio usuário
-
-A composição parte de uma raiz vazia e aplica, nesta ordem:
-1. o patch de cada bundle em `dsh.profile.bundles` (ordem)
-2. depois `cordis.patch.yml` do perfil, depois `$DSH_HOME/cordis.patch.yml` (home)
-3. depois overlays `--patch`
-
-Bundles resolvem primeiro da instalação DSH (`@deepseek-ai/dsh-base`, `dsh-web-app`,
-`dsh-headless`, `dsh-sdk-app`, …), depois dos `node_modules` do perfil, onde o pnpm
-instala plugins fora da árvore.
-
-### 1.3 Modos de entrada (entry modes)
-
-| Comando | Propósito |
-|---|---|
-| `dsh --profile <name>` | Bootar o perfil nomeado sob `$DSH_HOME/profiles/<name>`. |
-| `dsh --profile <name> --from-default-profile <template>` | Criar um perfil custom a partir de um template, depois bootá-lo. |
-| `dsh --profile acp` | Servir clientes ACP via stdio até desconectar. |
-| `dsh --profile headless "job"` | Uma sessão persistente nova, imprimir resposta final e sair. |
-| `dsh --profile sdk` / `sdk-minimal` | Servir clientes SDK via JSON-RPC stdio. |
-| `dsh web` | Alias de `--profile web`. |
-| `dsh plugin --profile <name> <pnpm args>` | Gerenciar plugins do perfil, encadeando ao pnpm. |
-
-O diretório invocado é a raiz do workspace por padrão. O nome `desktop` está reservado
-ao perfil proprietário do Electron; o CLI rejeita boot/config-dump/plugin-management
-para ele.
-
-### 1.4 Ferramentas do agente (tools)
-
-As ferramentas nativas expostas nesta sessão: `ask_user_question`, `bash`,
-`create_goal`, `edit`, `exit_plan_mode`, `get_goal`, `glob`, `grep`, `job_kill`,
-`job_list`, `job_output`, `read`, `skill`, `todo_write`, `update_goal`, `write`,
-`web_fetch`, `web_search` e `system_search`. `system_search` localiza por nome arquivos,
-diretórios, executáveis, aplicativos instalados e dados de aplicativos, incluindo
-locais ocultos como `~/.local/share`; deve ser usada antes de adivinhar caminhos,
-aplicar glob amplo ou tentar ler um diretório. A ferramenta `web_search` usa exclusivamente o provedor local
-SearXNG e pode ser descoberta no catálogo pelos termos `searxng`, `web`, `internet`,
-`busca`, `buscador` ou `pesquisa`. As ferramentas mapeiam-se aos bundles internos:
-`dsh-tool-bash/pwsh/fs/goal/jobs/skill/todo/subagent/workflow/web/ask-user/fs-search/present`
-e ao plugin local `dsh-system-search`.
-
-### 1.5 Skills (mecanismo)
-
-Skills são instruções estruturadas em Markdown carregadas de `$DSH_HOME/skills/*/SKILL.md`
-e de pacotes de skill embutidos (`dsh-skill`, `dsh-client-ui-skill`). Cada `SKILL.md`
-tem frontmatter:
-
-```yaml
----
-name: <nome>
-description: <para o modelo — quando usar / escopo>
-user-invocable: false        # pode o usuário chamar diretamente?
-disable-model-invocation: false  # o modelo pode invocá-la automaticamente?
----
-# corpo da instrução (política, passos, limites)
+```text
+modelo local
+   │
+   ▼
+preset do agente
+   │
+   ▼
+ferramentas / skills / goals
+   │
+   ▼
+verification + context guard
+   │
+   ▼
+executor DSH
+   │
+   ├── jobs
+   ├── filesystem
+   ├── shell
+   ├── web
+   ├── browser
+   └── memory
+   │
+   ▼
+patches do runtime
+   │
+   ▼
+LM Studio / serviços locais / sistema operacional
 ```
 
-O `description` é a única coisa que o modelo lê para decidir quando aplicar; o corpo
-é a política executada. Skills com `user-invocable: false` não são chamadas pelo
-usuário e `disable-model-invocation: true` bloqueiam invocação automática (ex.:
-`local-single-agent`).
+A estratégia central é deslocar parte da confiabilidade do modelo para
+mecanismos determinísticos do harness:
 
-### 1.6 Ciclo de contexto / Context Guard (loop-safety)
-
-Para sessões de modelo local há um **guardião de contexto** persistente que mede
-tokens estimados e impõe limites duradouros por turno. A janela e os limiares
-efetivos são derivados em tempo de execução a partir do preset selecionado e
-dos ratios definidos nos sliders. O aviso `ACTIVE CONTEXT POLICY` e o medidor
-nativo são a referência da sessão; números fixos nesta documentação não devem
-ser usados para inferir o orçamento ativo.
-
-- abaixo do limiar de economia — operação normal;
-- entre economia e checkpoint — leituras direcionadas, resultados concisos e diffs;
-- entre checkpoint e compactação — preservar objetivo, restrições, trabalho feito,
-  decisões, arquivos mudados, comandos/resultados relevantes, erros abertos, estado
-  atual e **um próximo passo**;
-- no limiar de compactação — salvar o estado e compactar conforme a política ativa.
-
-No perfil Web, o plugin `dsh-context-guard` também registra a seção **Contexto e
-compactação** nas configurações. Os sliders editam uma única política por preset:
-tamanho da janela, economia, checkpoint, limiar de compactação, reservas de
-resposta/resumo/segurança e retenção. Os valores absolutos em tokens são derivados
-dos ratios, e os limites entre campos são ajustados para preservar as reservas.
-O botão **Reiniciar DSH** solicita o reinício ao supervisor do host; quando o
-processo não foi iniciado sob um supervisor, a interface informa que a operação
-não está disponível em vez de encerrar o processo silenciosamente.
-
-Limites duros por turno (resets apenas com uma nova virada do usuário; a compactação
-não os renova): **48 passos, 48 chamadas de ferramenta, 15 minutos e 120 000 tokens
-high-water**. Após timeout, o executor gerencia o processo, coleta saída disponível e
-entra em *diagnostic mode* (no máximo 3 chamadas limitadas, 2 min, 24 000 tokens). O
-comando exato que expirou é bloqueado até ver uma mudança de código/configuração ou
-estratégia. `PAUSE` cancela o turno e nega chamadas subsequentes na fronteira do
-executor — prosa do modelo não a sobrepõe.
-
-Progresso = evidência nova (resultado, erro novo, teste mudado, correção confirmada).
-Leituras idênticas, timeouts repetidos ou chamadas equivalentes **não** resetam o budget.
+- reduzir superfícies de orquestração para modelos pequenos;
+- impedir loops no executor;
+- exigir evidência antes de conclusão;
+- compactar contexto de forma durável;
+- manter memória persistente separada de estado transitório;
+- observar jobs sem punir esperas válidas.
 
 ---
 
-## 2. Skills implementadas — o que cada uma faz e como funciona
+## 2. Composição do DSH
 
-### 2.1 Skills funcionais no repositório (24 skills live em `~/.dsh/skills/`)
+O DSH usa Cordis para compor bundles e patches. A precedência exata pode variar
+conforme profile e overlays, mas conceitualmente há:
 
-| # | Skill | Foco / o que faz | Como funciona (resumo) |
-|---|-------|------------------|------------------------|
-| 1 | **acompanhamento** | Acompanhar chamadas de ferramentas demoradas sem loops redundantes. | Proba artefatos duráveis/estado por classe de ferramenta diferente (mtime/tamanho, `pgrep`/`ps`) e prefere `job_list`/`job_output` em vez de `tail` de log — cada probe produz evidência nova. |
-| 2 | **apresentacoes-template** | Preencher apresentação PPTX existente com conteúdo estruturado + verificar slides renderizados. | Lê template, preenche por dados estruturados; **não** promete criação livre de design. |
-| 3 | **compressao-midia** | Comprimir imagens/áudio/vídeo locais por qualidade ou meta de tamanho. | Preserva originais e limita tentativas + tempo total. |
-| 4 | **configuracoes-estruturadas** | Editar configs locais JSON/YAML/TOML por caminhos e valores explícitos. | Pré-condições, validação de tipos, saída separada; não edita fora do alvo. |
-| 5 | **context-guard** | Política persistente de budget/contexto/checkpoint/loop-safety (auto-reforçada). | Reinforcada pelo harness; `user-invocable:false`, não espera invocação. |
-| 6 | **dados-tabulares** | Transformar tabelas CSV/TSV/JSON ou reconciliar duas por chaves explícitas. | Detecta duplicatas/divergências **sem** modificar as origens. |
-| 7 | **diagnostico-servicos-logs** | Diagnosticar containers/serviços/URLs/arquivos de log locais. | Coleta limitada + evidências redigidas; **não** reinicia nem altera serviços. |
-| 8 | **documentos-template** | Preencher template DOCX com dados estruturados + verificar pacote/campos. | Para documentos Word baseados em modelo; não cobre redline complexo. |
-| 9 | **graficos-locais** | Gerar gráficos PNG/SVG/PDF a partir de tabela local validada. | Preserva especificação, rótulos, unidades e proveniência. |
-| 10 | **imagens-lote** | Redimensionar/cortar/convertir/generar miniaturas de imagens locais em lote. | Preserva originais; confirma dimensões/formato. |
-| 11 | **jornadas-navegador** | Executar jornadas funcionais curtas no navegador local a partir de passos/checks. | Relatório por etapa + captura de falhas. |
-| 12 | **local-single-agent** | Rodar tarefas com um único agente principal local, sem subagentes/workflow/Ralph/chamadas delegadas. | `disable-model-invocation:true` — bloqueia invocação automática. |
-| 13 | **midia-local** | Inspecionar/cortar/extrair áudio/convertir arquivos locais de áudio/vídeo (FFmpeg). | Verifica duração, codecs e decodificação. |
-| 14 | **organizacao-arquivos** | Planejar/aplicar cópias/renomeações em lote por mapeamentos explícitos. | Detecta colisões/duplicatas, verifica hashes, registra recuperação parcial. |
-| 15 | **paginas-estaticas** | Criar/ajustar página HTML/CSS local baseada em template + verificar links/assets/responsividade. | Para sites estáticos pequenos; publicação não faz parte da skill. |
-| 16 | **pdf-utilidades** | Inspecionar/transformar PDFs locais, extrair texto e OCR de páginas escaneadas/imagens. | Resultados verificáveis; preserva originais. |
-| 17 | **pesquisa-fontes** | Respostas curtas com afirmações ligadas a fontes realmente consultadas (fato/inferência/bloqueio). | Para perguntas externas delimitadas; não é pesquisa autônoma extensa. |
-| 18 | **planilhas-locais** | Criar/editar XLSX locais em células/intervalos/abas/tabelas explícitos. | Preserva conteúdo fora do alvo e declara situação de recálculo. |
-| 19 | **prism-modpack** | Montar modpacks completos no Prism e corrigir crashes de inicialização pelos logs. | Instala em lote; não testa mods individualmente nem gameplay por padrão. |
-| 20 | **quebra-de-loop** | Check automatizado contra loops de investigação redundante + guia para quebrá-los. | Antes de cada passo, exige evidência suficiente; nunca repete leituras equivalentes. |
-| 21 | **sqlite-local** | Inspecionar schema e consultar bancos SQLite locais somente leitura (parâmetros/limites). | Exporta JSON ou CSV. |
-| 22 | **testes-api** | Verificar endpoints HTTP autorizados com especificação JSON limitada (status/cabeçalhos/corpo). | Sem repetir requisições nem vazar segredos. |
-| 23 | **tool-first** | Investigar arquivos e dados com ferramentas determinísticas e saída limitada. | Prefere ferramenta pronta, Bash curto e scratch delimitado. |
-| 24 | **verificacao-projeto** | Descobrir e executar verificações que já existem em um projeto (timeout + relatório de evidências). | Não inventa comandos nem altera o projeto. |
+1. bundles base do DSH;
+2. patches dos bundles;
+3. bundles do profile;
+4. `cordis.patch.yml` do profile;
+5. patch global `~/.dsh/cordis.patch.yml`;
+6. overlays adicionais;
+7. settings persistidos pela UI.
 
-> O `HANDOFF.md` ainda referencia uma skill `declaracao-capacidade` que **não está** em
-> `~/.dsh/skills/`.
-
-### 2.2 Como as skills funcionam (mecanismo comum)
-
-1. **Frontmatter** (`name`, `description`, flags de invocação) é o contrato — o modelo
-   decide *quando* aplicar pelo `description`.
-2. **Corpo** = política executável: passos, pré-condições, limites e verificação.
-3. **Disciplina compartilhada:** todas seguem "evidência suficiente → ação autorizada",
-   sem repetir leituras equivalentes; preferem ferramentas duráveis (`job_list`,
-   `job_output`) sobre logs voláteis; preservam originais e declaram estado de recálculo/
-   verificação.
+Por isso existem arquivos com valores aparentemente diferentes para a mesma
+política. Durante uma sessão, a configuração efetiva exposta pelo runtime é a
+autoridade.
 
 ---
 
-## 3. Limitações encontradas (nesta sessão / runtime)
+## 3. Profiles
 
-| # | Limitação | Evidência |
-|---|-----------|-----------|
-| L1 | **Budgets duros por turno** — 48 passos, 48 chamadas de ferramenta, 15 min, 120k tokens; reset só com nova virada do usuário. A compactação não renova. | `context-guard/SKILL.md`, `AGENTS.md` |
-| L2 | **Context Guard interrompe** o passo ativo nos thresholds e dispara compactação automática (≥94371). | `context-guard/SKILL.md` |
-| L3 | **Diagnostic mode** pós-timeout: no máximo 3 chamadas limitadas, 2 min, 24k tokens; comando expirado bloqueado até mudança de código/config/estratégia. | `context-guard/SKILL.md` |
-| L4 | **`PAUSE`** cancela o turno e nega chamadas subsequentes na fronteira do executor — prosa/notice não sobrepõe. | `context-guard/SKILL.md` |
-| L5 | **Approval prompts desativados** nesta sessão: ações que exigem aprovação são rejeitadas automaticamente; o agente **não** pode pedir escalonamento de sandbox nem auto-conceder capacidade. | instrução de sessão, `HANDOFF.md` §23 |
-| L6 | **`update_goal` sem campo para read-only-executor capability** → agente não pode auto-habilitar; resolução = habilitação pelo operador/nível de sessão. | `HANDOFF.md` §23 |
-| L7 | **Goal antigo (Scryfall scrape)** só parcialmente visível na imagem; `get_goal` retorna apenas o goal ativo — não dá para editar sem objetivo/revision completos + capacidade. | `HANDOFF.md` §24 |
-| L8 | **Referência histórica ausente** — HANDOFF menciona skill `declaracao-capacidade`, que não existe no live. | ver §2.1 |
-| L9 | **Perfil `desktop` reservado** ao Electron; CLI rejeita boot/config-dump/plugin-management para ele. | `@deepseek-ai/dsh/README.md` |
-| L10 | **Comandos inválidos / flags de outro modo / erros de config / boot falho → exit nonzero.** | `@deepseek-ai/dsh/README.md` |
-| L11 | **Backup exclui intencionalmente** sessões, histórico, caches, estado do navegador e credenciais → reautenticar após restore. | `README.md`, `.gitignore` |
-| L12 | **Snapshot sem dry-run**, allowlist explícito, substitui caminhos machine-específicos por marcadores; modelos locais (LM Studio) e apps externos são pré-requisitos não versionados. | `README.md`, `INSTALACAO.md` §12 |
+Existem **3 profiles**.
 
----
+### 3.1 `web`
 
-## 4. Backup live → GitHub: confirmado
+Profile de interface web padrão.
 
-**Sim.** A instalação live tem backup neste repositório, empurrado para o GitHub.
+Bundles relevantes:
 
-- **Remote Git:** `origin` → `https://github.com/xoykor/DSH-Backup` (branch `master`).
-- **Página do repo (verificada via web_fetch, HTTP 200):**
-  > "Backup das configurações do Deepseek Harness - Otimizado para o uso agentico de IA localmente e integração com o Codex da OpenAI."
+- DSH base;
+- DSH web app;
+- Relay Codex;
+- Context Guard;
+- Continue Button;
+- Global Token Meter;
+- DSH-memory.
 
-### Fluxo live → backup → GitHub
+O profile usa reload de patch em modo `live`.
 
-1. `restore-dsh.sh snapshot` — copia **live→backup** com normalização automática de
-   caminhos; exclui segredos/sessões/cache (allowlist explícito, sem dry-run).
-2. Commit local no branch `master`.
-3. Push para `origin` (`https://github.com/xoykor/DSH-Backup`).
+### 3.2 `robust-local`
 
-### Evidência concreta
+Profile especializado para modelos locais.
 
-| Item | Valor |
-|------|-------|
-| Diretório do backup (live) | `/home/x/Documentos/DSH/` |
-| Remote GitHub | `https://github.com/xoykor/DSH-Backup` |
-| Branch | `master` |
-| Status da página no GitHub | **Ao vivo** (HTTP 200, descrição confirmada) |
-| Arquivos versionados | `INSTALACAO.md`, `README.md`, `manifest.yaml`, `HANDOFF.md`, `restore-dsh.sh`, `runtime/`, `dsh/` (profiles/plugins/presets/skills/configs), `.gitignore` |
-| **Não** versionado (intencional) | `secrets`, `sessions`, `storages`, `attachments`, `backups`, `compaction-*`, `node_modules`, credenciais, histórico |
+Principais características:
 
-> Nota: o workspace `/home/x/Documentos/DSH` é o clone do repo; o **live** real está
-> em `~/.dsh` e `~/.codex`. O snapshot normaliza `$HOME`/`$CODEX_HOME`/`$DSH_HOME` no
-> commit e a restauração reverte as substituições.
+- Context Guard como bundle próprio;
+- DSH-memory como dependência;
+- verificação de metas;
+- verification enforcement;
+- browser local;
+- ferramentas auxiliares de plugin, teste, score, budget e diagnóstico;
+- checkpoint rewind;
+- doublecheck;
+- library/RAG.
+
+O goal padrão é desabilitado neste profile e uma variante verificada é montada
+no lugar.
+
+### 3.3 `headless`
+
+Profile para execução sem a UI web.
 
 ---
 
-## 5. Referências
+## 4. Presets
 
-- [`INSTALACAO.md`](./INSTALACAO.md) — documentação completa da instalação live (modelos, perfis, presets, plugins, bridge).
-- [`README.md`](./README.md) — restore/snapshot/verify e política de versionamento.
-- [`HANDOFF.md`](./HANDOFF.md) — handoff de sessão (commits, decisão pendente `declaracao-capacidade`, bloqueios).
-- Checkout do runtime: `/home/x/.local/lib/dsh-runtime-0.1.5-rc.2/` → pacote `@deepseek-ai/dsh@0.1.5-rc.2`.
-- Sistema-prompt/contexto do agente nesta sessão: `~/.dsh/AGENTS.md` (inclui a skill `anti-investigacao-redundante`).
+Existem **6 presets**:
+
+| Preset | Papel |
+|---|---|
+| `local-models` | modelo local genérico |
+| `local-models-ptc` | ferramentas em modo PTC |
+| `local-robust-9b` | execução robusta single-agent para 9B |
+| `local-robust-27b` | execução robusta para o modelo local de 27B |
+| `ornith-gemini-architect` | arquitetura/planejamento híbrido |
+| `relay-codex` | integração Relay/Codex |
+
+### 4.1 Local Robust 9B
+
+O `local-robust-9b` é deliberadamente restritivo na orquestração:
+
+- Ralph desabilitado;
+- subagents desabilitados;
+- forks desabilitados;
+- providers externos de subagent desabilitados;
+- workflow genérico desabilitado;
+- ferramentas nativas mantidas.
+
+A instrução do preset também estabelece explicitamente:
+
+```text
+Do not use Ralph.
+Do not use subagents or delegation.
+Work alone.
+```
+
+O objetivo é reduzir a árvore de decisões do modelo e fazer o 9B trabalhar com
+ferramentas determinísticas em vez de delegação recursiva.
+
+### 4.2 PTC
+
+No `local-models-ptc`, a apresentação de ferramentas usa o modo `ptc`.
+Ralph, subagents e workflow genérico permanecem desabilitados para não criar
+outra superfície de programação/orquestração concorrente com `run_code`.
+
+---
+
+## 5. AGENTS.md: política global
+
+`dsh/AGENTS.md` é a principal camada de instrução global do agente.
+
+Ela define, entre outras coisas:
+
+- política tool-first;
+- comportamento anti-loop;
+- política de compactação;
+- observação correta de jobs;
+- memória persistente;
+- regras de segurança do `run_code`;
+- ambiente CachyOS/Arch;
+- shell interativo fish para comandos destinados ao usuário;
+- catálogo de skills.
+
+O arquivo é uma política de modelo. As garantias críticas de loop, timeout e
+compactação não dependem somente dele; são reforçadas pelo executor.
+
+---
+
+## 6. Tool-first
+
+A skill global `tool-first` orienta investigação local na seguinte ordem:
+
+1. ferramenta determinística pronta;
+2. pipeline shell curto;
+3. scratch Lua para lógica estruturada;
+4. Python quando biblioteca/formato especializado justificar;
+5. leitura direta do trecho necessário.
+
+A intenção é evitar:
+
+- despejo de arquivos inteiros;
+- scripts desnecessários;
+- parsing manual de formatos já suportados;
+- consumo excessivo de contexto.
+
+Resultados devem preservar evidência acionável: caminho, linha, contagem,
+truncamento e erro.
+
+---
+
+## 7. Anti-loop em duas camadas
+
+Há duas camadas complementares.
+
+### 7.1 Orientação ao modelo
+
+Skills como:
+
+- `quebra-de-loop`;
+- `anti-investigacao-redundante` nos presets robustos;
+- `acompanhamento`;
+
+ensinam o agente a não repetir investigações equivalentes.
+
+### 7.2 Interceptação determinística
+
+O plugin `dsh-context-guard` observa diretamente a execução.
+
+Ele mantém estado sobre:
+
+- ação canônica;
+- argumentos;
+- fingerprints de resultado;
+- família de erro;
+- versão de mudança do workspace;
+- sequência recente de ações;
+- texto repetido do assistente;
+- jobs coletados;
+- pressão de contexto.
+
+Trocar apenas:
+
+- wording;
+- ferramenta;
+- ordem de leitura;
+- grep por read;
+- chamada equivalente;
+
+não é suficiente para escapar do bloqueio se o executor conclui que a
+investigação continua materialmente igual.
+
+---
+
+## 8. Context Guard
+
+O plugin está em:
+
+```text
+dsh/plugins/dsh-context-guard/
+```
+
+Ele injeta hooks no runtime DSH e atua antes/depois de chamadas de ferramenta,
+durante passos do agente e em eventos de sessão.
+
+### 8.1 Progresso
+
+Progresso é evidência nova, por exemplo:
+
+- novo resultado;
+- erro materialmente diferente;
+- teste com resultado diferente;
+- mutação real do workspace;
+- hipótese eliminada;
+- correção confirmada.
+
+Executar uma ferramenta por si só não é progresso.
+
+### 8.2 Falhas equivalentes
+
+Falhas são agrupadas por famílias. Repetir a mesma classe de falha sem mudança
+observável consome o orçamento anti-loop da estratégia.
+
+### 8.3 Ciclos
+
+O guard guarda um histórico compacto de ações e fingerprints. Sequências
+repetidas com resultados inalterados podem encerrar o turno mesmo quando cada
+chamada individual usa argumentos ligeiramente diferentes.
+
+### 8.4 PAUSE/STOP
+
+Quando o guard decide pausar ou encerrar, o bloqueio ocorre na fronteira do
+executor. Texto do modelo não pode reautorizar ferramentas.
+
+---
+
+## 9. Limites de turno: correção importante
+
+Documentação histórica mencionava como limite geral:
+
+```text
+48 passos
+48 chamadas
+15 minutos
+```
+
+Isso **não é verdadeiro para os presets robustos atuais**.
+
+`local-robust-9b` e `local-robust-27b` configuram:
+
+```yaml
+maxTurnSteps: null
+maxTurnToolCalls: null
+maxTurnMs: null
+```
+
+Portanto, nesses presets, uma tarefa produtiva pode continuar através de
+compactações até ser implementada e verificada.
+
+Continuam ativos:
+
+- detecção de loop;
+- limites de diagnóstico;
+- timeout próprio de ferramentas;
+- cancelamento;
+- autoridade/permissões;
+- orçamento de contexto;
+- compactação.
+
+Os defaults globais de 48/48/900000 ms ainda existem para presets que não os
+sobrescrevem.
+
+---
+
+## 10. Política de contexto
+
+O Context Guard deriva os limites absolutos a partir de ratios.
+
+Os campos configuráveis incluem:
+
+- `contextWindow`;
+- `economyRatio`;
+- `checkpointRatio`;
+- `compactRatio`;
+- `responseRatio`;
+- `summaryRatio`;
+- `summaryMinRatio`;
+- `safetyRatio`;
+- `retainRatio`.
+
+Em vez de depender de valores escritos neste documento, o agente recebe um
+notice semelhante a:
+
+```text
+ACTIVE CONTEXT POLICY:
+effective context window ...
+economy ...
+checkpoint ...
+automatic compaction ...
+```
+
+Esse notice e o medidor nativo são a referência da sessão.
+
+---
+
+## 11. Compactação
+
+O DSH original foi estendido para tornar a compactação mais segura.
+
+### 11.1 Fluxo
+
+```text
+threshold atingido
+     │
+     ▼
+interrompe admissão de novo trabalho
+     │
+     ▼
+aguarda passo ativo estabilizar
+     │
+     ▼
+resume histórico durável balanceado
+     │
+     ▼
+valida tamanho/saída
+     │
+     ▼
+persiste resumo
+     │
+     ▼
+persiste checkpoint
+     │
+     ▼
+substitui superfície de contexto
+     │
+     ▼
+retoma execução
+```
+
+### 11.2 Falha fechada
+
+Não há substituição se o resumo:
+
+- falhar;
+- estiver vazio;
+- for truncado;
+- contiver saída não textual inadequada;
+- não couber com a margem de segurança;
+- não puder ser persistido.
+
+A compactação não apaga evidência de loops ou renova artificialmente orçamento
+de diagnóstico.
+
+---
+
+## 12. Patches de runtime
+
+Existem **5 patches** versionados.
+
+### 12.1 Checkpoint Compaction
+
+Local:
+
+```text
+runtime/patches/checkpoint-compaction/
+```
+
+Extende `@deepseek-ai/dsh-compaction-basic@0.1.5-rc.2`.
+
+Funções principais:
+
+- resumo do histórico durável;
+- pricing do envelope;
+- redução do output cap quando necessário;
+- persistência antes da substituição;
+- preservação de mensagens que chegam fora do span;
+- rejeição de tool calls emitidas durante o resumo.
+
+### 12.2 Compaction Progress
+
+Local:
+
+```text
+runtime/patches/compaction-progress/
+```
+
+Adiciona feedback visual à UI durante compactação.
+
+As barras são indeterminadas porque o protocolo não fornece percentual real de
+prefill do LM Studio.
+
+### 12.3 Goal Round Compaction
+
+Local:
+
+```text
+runtime/patches/goal-round-compaction/
+```
+
+Corrige interação entre goals e pausa de compactação. Rejeições transitórias
+causadas pelo Context Guard deixam de ser interpretadas como bloqueio
+permanente do goal.
+
+Uma pausa intencional do usuário não é retomada automaticamente.
+
+### 12.4 Job Observation
+
+Local:
+
+```text
+runtime/patches/job-observation/
+```
+
+Expõe capacidade de observação real para:
+
+- `job_output`;
+- `job_list`.
+
+A capacidade é reconhecida pela definição registrada da ferramenta, não pelo
+nome escrito pelo modelo.
+
+`job_kill` e mutações de goal não recebem capacidade read-only.
+
+### 12.5 Local HTTP Timeout
+
+Local:
+
+```text
+runtime/patches/local-http-timeout/
+```
+
+O DSH pode configurar watchdogs de 900000 ms, mas o transporte Node/Undici
+podia encerrar o request antes disso durante prefill sem streaming.
+
+O patch aplica timeouts maiores somente ao origin loopback configurado,
+preservando:
+
+- abort signals;
+- TLS;
+- conteúdo da request;
+- política de redirects fora do origin.
+
+---
+
+## 13. Jobs gerenciados
+
+Esperar um job ativo é diferente de repetir uma investigação.
+
+O padrão recomendado é:
+
+```text
+job_output(job_id, wait=true, wait_ms≈30000)
+```
+
+Quando o executor reconhece a espera de um job realmente ativo:
+
+- ela não cria progresso artificial;
+- ela não limpa falhas anteriores;
+- ela não conta como repetição de investigação;
+- ela não cancela o job ao expirar.
+
+`waitExpired:true` significa que o período de espera terminou com o job ainda
+ativo.
+
+A primeira coleta terminal pode ser tratada como observação válida. Releituras
+repetidas de um job já concluído voltam a ser limitadas normalmente.
+
+---
+
+## 14. Timeout e diagnóstico
+
+Após um timeout real de executor, o guard entra em modo de diagnóstico.
+
+Defaults atuais:
+
+- no máximo 3 chamadas diagnósticas;
+- no máximo 2 minutos.
+
+Somente observadores reconhecidos pelo executor podem furar as restrições
+read-only apropriadas.
+
+Um segundo timeout durante diagnóstico encerra a estratégia; compactação ou
+texto do modelo não renovam esse orçamento.
+
+---
+
+## 15. Verificação de metas
+
+O profile `robust-local` inclui:
+
+- `dsh-goal-verification`;
+- `dsh-verification`.
+
+A configuração atual usa `mode: enforce`.
+
+Para trabalhos relevantes, a intenção é aproximar a execução de:
+
+```text
+pedido
+→ contrato/intenção
+→ implementação
+→ evidência
+→ oráculos/verificação
+→ conclusão
+```
+
+O sistema captura evidências e evita que uma simples alegação do modelo seja
+tratada como prova de conclusão.
+
+---
+
+## 16. Memória persistente
+
+A camada persistente atual é **dsh-memory 0.7.1**.
+
+Ela é instalada como dependência dos profiles:
+
+- `web`;
+- `robust-local`.
+
+O `AGENTS.md` estabelece o uso das operações:
+
+| Operação | Uso |
+|---|---|
+| `memory_search` | recuperar contexto durável |
+| `memory_write` | criar fato durável |
+| `memory_update` | atualizar valor canônico |
+| `memory_review` | curadoria/manutenção |
+| `memory_stats` | diagnóstico |
+
+O modelo não deve usar memória persistente para estado transitório de tarefas,
+logs ou segredos.
+
+O antigo plugin Memento foi removido do harness atual.
+
+---
+
+## 17. Skills globais
+
+Existem **24 skills globais** em `dsh/skills/`.
+
+| # | Skill | Função |
+|---:|---|---|
+| 1 | `acompanhamento` | esperar jobs e verificar término real |
+| 2 | `apresentacoes-template` | preencher PPTX baseado em template |
+| 3 | `compressao-midia` | comprimir mídia com limites medidos |
+| 4 | `configuracoes-estruturadas` | editar JSON/YAML/TOML de forma delimitada |
+| 5 | `context-guard` | política de contexto e loop |
+| 6 | `dados-tabulares` | transformar/reconciliar dados tabulares |
+| 7 | `diagnostico-servicos-logs` | diagnóstico read-only de serviços/logs |
+| 8 | `documentos-template` | preencher DOCX baseado em template |
+| 9 | `graficos-locais` | gerar gráficos a partir de tabelas |
+| 10 | `imagens-lote` | converter/redimensionar imagens em lote |
+| 11 | `jornadas-navegador` | executar jornadas curtas de browser |
+| 12 | `local-single-agent` | execução explícita sem delegação |
+| 13 | `midia-local` | operações locais com áudio/vídeo |
+| 14 | `organizacao-arquivos` | cópia/rename em lote |
+| 15 | `paginas-estaticas` | páginas HTML/CSS pequenas |
+| 16 | `pdf-utilidades` | inspeção/transformação de PDF |
+| 17 | `pesquisa-fontes` | pesquisa externa delimitada com fontes |
+| 18 | `planilhas-locais` | edição de XLSX |
+| 19 | `prism-modpack` | criação/correção de modpack Prism |
+| 20 | `quebra-de-loop` | quebrar investigação redundante |
+| 21 | `sqlite-local` | consultas SQLite read-only |
+| 22 | `testes-api` | teste delimitado de endpoints HTTP |
+| 23 | `tool-first` | investigação determinística primeiro |
+| 24 | `verificacao-projeto` | descobrir e executar verificações existentes |
+
+Skills específicas de preset existem separadamente, por exemplo
+`anti-investigacao-redundante` e `auditoria-visual` no
+`local-robust-9b`.
+
+---
+
+## 18. Plugins versionados
+
+Existem **20 diretórios de plugins** em `dsh/plugins/`:
+
+1. `dsh-architect`
+2. `dsh-budget`
+3. `dsh-checkpoint-rewind`
+4. `dsh-context-guard`
+5. `dsh-continue-button`
+6. `dsh-doublecheck`
+7. `dsh-fast`
+8. `dsh-global-token-meter`
+9. `dsh-goal-verification`
+10. `dsh-library`
+11. `dsh-output-styles`
+12. `dsh-plugin-guide`
+13. `dsh-qwen-defaults`
+14. `dsh-score`
+15. `dsh-system-search`
+16. `dsh-test-drive`
+17. `dsh-tool-browser`
+18. `dsh-translate`
+19. `dsh-verification`
+20. `dsh-web-search-searxng`
+
+Nem todos são necessariamente carregados em todo profile.
+
+`dsh-memory` não aparece nessa lista porque é uma dependência externa fixada
+nos `package.json` dos profiles.
+
+---
+
+## 19. Modelos
+
+### Robust local
+
+O profile robusto registra:
+
+| Provider | Modelo | Janela configurada | Output cap |
+|---|---|---:|---:|
+| LM Studio | `ornith-1.5-9b` | 131072 | 24576 |
+| LM Studio | `qwen3.8-27b-gsq-rco` | 64000 | 12000 |
+
+O Ornith é o default do profile.
+
+O plugin `dsh-qwen-defaults` faz routing/defaults específicos do Qwen quando o
+preset de 27B está ativo.
+
+---
+
+## 20. Serviços externos locais
+
+O harness depende de alguns serviços fora do snapshot.
+
+### LM Studio
+
+```text
+http://127.0.0.1:1234/v1
+```
+
+### SearXNG
+
+```text
+http://127.0.0.1:8888
+```
+
+### Browser tool
+
+```text
+http://127.0.0.1:8731
+```
+
+Os binários/modelos desses serviços não são versionados aqui.
+
+---
+
+## 21. Testes
+
+O repositório contém suites específicas para componentes críticos.
+
+### Context Guard
+
+```text
+dsh/plugins/dsh-context-guard/tests/
+├── client.test.mjs
+├── job-observation.test.mjs
+├── policy.test.mjs
+└── preset-policies.test.mjs
+```
+
+### Runtime patches
+
+```text
+runtime/patches/job-observation/tests/runtime.test.mjs
+runtime/patches/checkpoint-compaction/tests/checkpoint.test.mjs
+runtime/patches/compaction-progress/tests/progress.test.mjs
+runtime/patches/goal-round-compaction/tests/runtime.test.mjs
+runtime/patches/local-http-timeout/tests/transport.test.mjs
+```
+
+Os testes de patches usam, quando aplicável, objetos reais do runtime DSH e
+servidores locais determinísticos para reproduzir falhas.
+
+---
+
+## 22. Restore e integridade
+
+`restore-dsh.sh` oferece:
+
+```text
+snapshot
+restore
+verify
+```
+
+O restore:
+
+- usa o runtime travado no lockfile;
+- preserva instalação anterior em backup;
+- materializa marcadores de caminho;
+- reinstala profiles;
+- aplica patches;
+- valida hashes;
+- rejeita conteúdos de runtime desconhecidos.
+
+Os aplicadores de patch são idempotentes e mantêm backup do original quando
+apropriado.
+
+---
+
+## 23. Snapshot e privacidade
+
+O snapshot exclui intencionalmente:
+
+- sessões;
+- histórico;
+- caches;
+- credenciais;
+- `.env*`;
+- auth files;
+- `credentials*`;
+- `node_modules`;
+- `*.jsonl`;
+- caches Python.
+
+`workspace.json` tem associações de sessões removidas antes de ser versionado.
+
+Essa filtragem não equivale a uma auditoria genérica de segredos. Um token
+colocado em um arquivo com nome inesperado ainda pode ser versionado; portanto
+o diff do snapshot deve ser revisado antes do push em repositório público.
+
+---
+
+## 24. Permissões
+
+A configuração atual define:
+
+```yaml
+permission:
+  defaultPreset: danger-full-access
+```
+
+O objetivo é permitir operação agentic local completa.
+
+É importante distinguir:
+
+- Context Guard controla loops/execução redundante;
+- verification controla alegações de conclusão;
+- permissões controlam autoridade;
+- nenhum desses mecanismos, isoladamente, equivale a sandbox forte.
+
+---
+
+## 25. Configuração duplicada e política efetiva
+
+Algumas políticas aparecem em mais de um arquivo:
+
+```text
+dsh/settings.yaml
+dsh/cordis.patch.yml
+dsh/profiles/robust-local/settings.yaml
+dsh/profiles/robust-local/cordis.patch.yml
+preset.yml
+agent.cordis.yml
+```
+
+Isso é consequência da composição do DSH, mas cria risco de documentação
+desatualizada.
+
+Regra operacional:
+
+> quando houver divergência, diagnostique a precedência e use a política
+> efetivamente exposta pelo runtime, não um valor isolado encontrado em um
+> arquivo.
+
+---
+
+## 26. Estado atual resumido
+
+| Componente | Estado |
+|---|---|
+| DSH | `0.1.5-rc.2` |
+| Profiles | 3 |
+| Presets | 6 |
+| Skills globais | 24 |
+| Plugins em `dsh/plugins` | 20 |
+| Runtime patches | 5 |
+| Memória persistente | DSH-memory 0.7.1 |
+| Modelo robusto default | Ornith 1.5 9B |
+| Backend local | LM Studio |
+| Pesquisa | SearXNG |
+| Subagents no Robust 9B | desabilitados |
+| Ralph no Robust 9B | desabilitado |
+| Workflow genérico no Robust 9B | desabilitado |
+| Verificação | enforce |
+| Permission preset | danger-full-access |
+
+---
+
+## 27. Referências internas
+
+- `README.md` — visão geral.
+- `INSTALACAO.md` — instalação e restauração.
+- `dsh/AGENTS.md` — política global.
+- `dsh/cordis.patch.yml` — patch global.
+- `dsh/profiles/robust-local/` — composição robusta.
+- `dsh/presets/local-robust-9b/` — preset principal do Ornith.
+- `dsh/plugins/dsh-context-guard/` — proteção determinística.
+- `runtime/patches/` — patches locais do runtime.
+- `restore-dsh.sh` — snapshot/restore/verify.
+- `HANDOFF.md` — registro histórico; não é fonte canônica da configuração
+  atual.
