@@ -5,6 +5,7 @@
     "dsh-context-guard": "file:__DSH_HOME__/plugins/dsh-context-guard",
     "dsh-continue-button": "link:__DSH_HOME__/plugins/dsh-continue-button",
     "dsh-global-token-meter": "link:__DSH_HOME__/plugins/dsh-global-token-meter",
+    "dsh-memory": "https://github.com/xoykor/DSH-memory/releases/download/v0.7.1/dsh-memory-0.7.1.tgz",
     "relay-dsh-plugin-codex": "0.2.2"
   },
   "dsh": {
@@ -15,7 +16,8 @@
         "relay-dsh-plugin-codex",
         "dsh-context-guard",
         "dsh-continue-button",
-        "dsh-global-token-meter"
+        "dsh-global-token-meter",
+        "dsh-memory"
       ],
       "patchReload": "live"
     }
