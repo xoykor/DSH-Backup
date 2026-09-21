@@ -8,6 +8,12 @@ versiona a camada de integração que torna o ambiente reproduzível: perfis,
 presets, skills, plugins locais, patches do runtime, bridge, configuração do
 Codex e o instalador/restaurador.
 
+## Objetivo
+
+Este repositório existe para transformar uma instalação agentic local em algo **restaurável, auditável e versionado**, em vez de depender de alterações manuais espalhadas pelo sistema. Ele reúne configuração declarativa, patches necessários, plugins/skills e scripts de restauração em um único snapshot.
+
+O foco não é distribuir modelos nem credenciais. Artefatos grandes, segredos e estado efêmero ficam fora do versionamento.
+
 ## Estado atual
 
 - DSH: `@deepseek-ai/dsh@0.1.5-rc.2`
@@ -81,6 +87,15 @@ preset/profile. A mensagem `ACTIVE CONTEXT POLICY` emitida pelo runtime é a
 fonte de verdade durante uma sessão; números estáticos na documentação não
 devem substituir essa política.
 
+## Fluxo recomendado
+
+1. revisar `manifest.yaml` e a documentação antes de restaurar;
+2. conferir versões de Node/pnpm/DSH;
+3. executar o restore em uma instalação limpa ou conhecida;
+4. validar plugins, patches e perfis;
+5. rodar as verificações documentadas antes de começar uma sessão agentic longa;
+6. gerar novo snapshot somente depois de confirmar que o ambiente está estável.
+
 ## Restore
 
 Feche processos DSH relevantes e execute, a partir da raiz do repositório:
@@ -152,3 +167,15 @@ ambiente/segredos fora do Git.
 - [HANDOFF.md](./HANDOFF.md) — registro histórico de decisões e sessões de
   manutenção; pode conter contexto antigo e não deve ser tratado como fonte
   canônica da configuração atual.
+
+
+## Segurança
+
+- Não versione chaves de API, cookies, tokens ou credenciais.
+- Revise patches de runtime antes de aplicá-los a uma versão diferente do DSH.
+- O restore deve ser tratado como alteração de ambiente de desenvolvimento: faça backup do estado local importante antes de executá-lo.
+- Plugins e skills de terceiros continuam sujeitos às suas próprias licenças e condições.
+
+## Licença
+
+GNU General Public License v3.0 para o conteúdo deste repositório quando aplicável. Componentes de terceiros permanecem sob suas licenças originais. Consulte [LICENSE](LICENSE) e os avisos/documentação associados.
