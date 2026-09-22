@@ -196,6 +196,12 @@ trust_level = "trusted"
 [projects."__HOME__/Documents/Codex/2026-09-18/https-github-com-xoykor-dra-andrea"]
 trust_level = "trusted"
 
+[projects."__HOME__/Documents/Codex/2026-09-20/in"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-21/no"]
+trust_level = "trusted"
+
 [desktop]
 followUpQueueMode = "steer"
 conversationDetailMode = "STEPS_COMMANDS"

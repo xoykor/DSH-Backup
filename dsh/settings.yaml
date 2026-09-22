@@ -41,10 +41,11 @@ llm-pi-ai:
             high: xhigh
         - id: gemma-4-12b-agentic-fable5-composer2.5-v2-3.5x-tau2@q4_k_m
           name: gemma-4-12b-agentic-fable5-composer2.5-v2-3.5x-tau2@q4_k_m
+        - id: ornith-dsh@q5_k_m
+          name: ornith-dsh@q5_k_m
 agent-default-model:
   provider: lmstudio
-  model: ornith-1.5-9b
-  reasoningEffort: high
+  model: ornith-dsh@q5_k_m
 permission:
   defaultPreset: danger-full-access
 dsh-context-guard:
