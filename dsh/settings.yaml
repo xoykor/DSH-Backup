@@ -3,6 +3,8 @@ ui-onboarding:
 agent-presets:
   default: minimal
 llm-deepseek:
+  timeoutMs: 2147483647
+  streamIdleTimeoutMs: 2147483647
   models:
     - id: deepseek-v4-flash
       name: DeepSeek-V4-Flash
@@ -26,10 +28,9 @@ llm-pi-ai:
       # Raised to the model's own cap (ornith). The backend's real window is
       # still controlled by LM Studio; this only sets DSH's assumed size.
       defaultContextWindow: 131072
-      # Local reasoning can remain silent while the model is thinking; give
-      # the stream watchdog more time and leave room for the final answer.
-      timeoutMs: 900000
-      streamIdleTimeoutMs: 900000
+      # Unlimited timeout / connection watchdog for local reasoning
+      timeoutMs: 2147483647
+      streamIdleTimeoutMs: 2147483647
       models:
         - id: ornith-1.5-9b
           maxTokens: 24576
