@@ -101,6 +101,7 @@ first Goal, web search or shell command of an operational task, read
 |---|---|---|
 | `acompanhamento` | Waiting for managed long-running work and verifying its real completion. | `skills/acompanhamento/SKILL.md` |
 | `apresentacoes-template` | Filling an existing PPTX template and checking rendered slides. | `skills/apresentacoes-template/SKILL.md` |
+| `comparar-ofertas` | Comparing current product offers by total cost, equivalent variant, delivery and reliability. | `skills/comparar-ofertas/SKILL.md` |
 | `compressao-midia` | Compressing local images, audio or video with measured limits. | `skills/compressao-midia/SKILL.md` |
 | `configuracoes-estruturadas` | Editing explicit paths and values in JSON, YAML or TOML. | `skills/configuracoes-estruturadas/SKILL.md` |
 | `context-guard` | Applying the persistent context, checkpoint and loop policy; normally activated by the harness. | `skills/context-guard/SKILL.md` |
@@ -116,14 +117,26 @@ first Goal, web search or shell command of an operational task, read
 | `organizacao-arquivos` | Planning and applying explicit batch copies or renames with collision checks. | `skills/organizacao-arquivos/SKILL.md` |
 | `paginas-estaticas` | Creating or adjusting a small local HTML/CSS page from a template. | `skills/paginas-estaticas/SKILL.md` |
 | `pdf-utilidades` | Inspecting or transforming PDFs, extracting text or running OCR. | `skills/pdf-utilidades/SKILL.md` |
+| `pesquisa-ampla` | Running broad, multi-domain web research with batched queries, deduplication and coverage metrics. | `skills/pesquisa-ampla/SKILL.md` |
 | `pesquisa-fontes` | Answering bounded external questions with consulted sources and separated inference. | `skills/pesquisa-fontes/SKILL.md` |
 | `planilhas-locais` | Creating or editing explicit cells, ranges, sheets or tables in local XLSX files. | `skills/planilhas-locais/SKILL.md` |
+| `prezi-em-pdf` | Capturing a public Prezi view and assembling its frames into a PDF. | `skills/prezi-em-pdf/SKILL.md` |
 | `prism-modpack` | Building complete Prism Launcher modpacks and correcting startup crashes from logs. | `skills/prism-modpack/SKILL.md` |
 | `quebra-de-loop` | Detecting and breaking redundant investigation loops. | `skills/quebra-de-loop/SKILL.md` |
 | `sqlite-local` | Inspecting schemas and querying local SQLite databases read-only. | `skills/sqlite-local/SKILL.md` |
 | `testes-api` | Checking authorized HTTP endpoints from a bounded JSON specification. | `skills/testes-api/SKILL.md` |
 | `tool-first` | Investigating local files, repositories and data with deterministic tools first. | `skills/tool-first/SKILL.md` |
 | `verificacao-projeto` | Discovering and running checks that already exist in a local project. | `skills/verificacao-projeto/SKILL.md` |
+| `google-drive` | Finding and managing Google Drive files through available authenticated tools; routing Docs, Sheets, Slides and comments. | `skills/google-drive/SKILL.md` |
+| `github` | Managing GitHub repositories, issues, pull requests, reviews and Actions through available authenticated tools. | `skills/github/SKILL.md` |
+| `google-docs` | Creating or editing Google Docs while preserving the requested document and template structure. | `skills/google-docs/SKILL.md` |
+| `google-sheets` | Reading or editing precise Google Sheets ranges, formulas and charts. | `skills/google-sheets/SKILL.md` |
+| `google-slides` | Creating or editing Google Slides with reference layouts and verified content. | `skills/google-slides/SKILL.md` |
+| `google-drive-comments` | Creating, replying to or resolving explicitly requested Google Drive comments. | `skills/google-drive-comments/SKILL.md` |
+| `write-like-me` | Drafting in the user's writing style using relevant authorized examples. | `skills/write-like-me/SKILL.md` |
+| `sites-building` | Building complete responsive websites using the local project's tools. | `skills/sites-building/SKILL.md` |
+| `sites-hosting` | Publishing an authorized website through an available hosting provider and verifying deployment. | `skills/sites-hosting/SKILL.md` |
+| `sites-preview-troubleshooting` | Diagnosing a failed local website preview from process, build and browser evidence. | `skills/sites-preview-troubleshooting/SKILL.md` |
 
 Supporting `scripts/`, `references/`, `assets/`, `fixtures/` and `tests/` live
 inside the same skill directory. Resolve relative links from that skill's
