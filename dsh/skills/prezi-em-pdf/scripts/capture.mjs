@@ -6,6 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { captureFrames } from './navigation.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -34,6 +35,10 @@ if(process.env.CODEX_MCP_NODE_PATH){
 const URL = process.argv[2] || 'https://prezi.com/view/enykLwOvHQqnUQs3eNwo/';
 const OUTDIR = process.argv[3] || process.env.PREZI_OUT || '/tmp/prezi2pdf/pages';
 fs.mkdirSync(OUTDIR, { recursive:true });
+const manifestPath = path.join(OUTDIR, '..', 'manifest.json');
+if (fs.existsSync(manifestPath) || fs.readdirSync(OUTDIR).some(name => /^\d+\.png$/.test(name))) {
+  throw new Error('Destino já contém uma captura. Use um diretório novo para preservar os resultados anteriores.');
+}
 
 const positiveInt=(name,fallback)=>{
   const value=Number.parseInt(process.env[name]||'',10);
@@ -75,8 +80,63 @@ function isBlank(buf){ // quadro todo-branco ou todo-preto
   }catch{return false;}
 }
 const hash=buf=>crypto.createHash('sha256').update(buf).digest('hex').slice(0,16);
+const signatureCache=new WeakMap();
+const SIGNATURE_W=160, SIGNATURE_H=90, SIMILAR_PIXEL_DELTA=3, SIMILAR_PIXEL_RATIO=0.9995;
+
+function visualSignature(buf){
+  if(!pngjs?.PNG) return null;
+  if(signatureCache.has(buf)) return signatureCache.get(buf);
+  try{
+    const { data, width, height }=pngjs.PNG.sync.read(buf);
+    const pixels=new Uint8Array(SIGNATURE_W*SIGNATURE_H*3);
+    for(let y=0;y<SIGNATURE_H;y++){
+      const sy=Math.min(height-1,Math.floor((y+0.5)*height/SIGNATURE_H));
+      for(let x=0;x<SIGNATURE_W;x++){
+        const sx=Math.min(width-1,Math.floor((x+0.5)*width/SIGNATURE_W));
+        const source=(sy*width+sx)*4, target=(y*SIGNATURE_W+x)*3;
+        pixels[target]=data[source]; pixels[target+1]=data[source+1]; pixels[target+2]=data[source+2];
+      }
+    }
+    const signature={ width, height, size:buf.length, pixels };
+    signatureCache.set(buf,signature);
+    return signature;
+  }catch{return null;}
+}
+
+function findSimilarFrame(frame, previous){
+  const candidates=[];
+  for(let index=0;index<previous.length;index++){
+    const old=previous[index];
+    if(Math.abs(old.length-frame.length)/Math.max(old.length,frame.length)<=0.03) candidates.push(index);
+  }
+  if(!candidates.length) return -1;
+  const current=visualSignature(frame);
+  if(!current) return previous.findIndex(old=>Buffer.compare(old,frame)===0);
+  for(const index of candidates){
+    const prior=visualSignature(previous[index]);
+    if(!prior||prior.width!==current.width||prior.height!==current.height) continue;
+    let similar=0;
+    for(let offset=0;offset<current.pixels.length;offset+=3){
+      const delta=Math.max(
+        Math.abs(current.pixels[offset]-prior.pixels[offset]),
+        Math.abs(current.pixels[offset+1]-prior.pixels[offset+1]),
+        Math.abs(current.pixels[offset+2]-prior.pixels[offset+2]),
+      );
+      if(delta<=SIMILAR_PIXEL_DELTA) similar++;
+    }
+    if(similar/(SIGNATURE_W*SIGNATURE_H)>=SIMILAR_PIXEL_RATIO) return index;
+  }
+  return -1;
+}
 
 async function main(){
+  const manifest = { schemaVersion: 2, url: URL, presentMode: false,
+    navigation: 'ArrowRight', completed: false, stopReason: 'in-progress', pages: [] };
+  const writeManifest = () => {
+    fs.writeFileSync(manifestPath + '.tmp', JSON.stringify(manifest, null, 2));
+    fs.renameSync(manifestPath + '.tmp', manifestPath);
+  };
+  writeManifest();
   const launchOptions={ headless:true, args:['--no-sandbox','--disable-dev-shm-usage','--force-device-scale-factor=1'] };
   const chromiumCandidates=[
     process.env.PREZI_CHROMIUM_PATH,
@@ -87,8 +147,9 @@ async function main(){
   ].filter(Boolean);
   const systemChromium=chromiumCandidates.find(candidate=>fs.existsSync(candidate));
   if(systemChromium) launchOptions.executablePath=systemChromium;
-  const browser=await playwright.chromium.launch(launchOptions);
+  let browser;
   try{
+    browser=await playwright.chromium.launch(launchOptions);
     const page=await browser.newPage();
     await page.setViewportSize({ width:W, height:H });
     const snap=()=>page.screenshot({ type:'png', clip:{ x:0,y:0,width:W,height:H } });
@@ -128,6 +189,8 @@ async function main(){
       }
     }
     if(!clicked) throw new Error('Não encontrou o botão Present');
+    manifest.presentMode = true;
+    writeManifest();
     try{ await page.locator('#onetrust-consent-sdk').evaluateAll(elements=>elements.forEach(element=>{ element.style.display='none'; })); }catch{}
     try{ await presentFrame.addStyleTag({ content:'.webgl-viewer-navbar,.webgl-viewer-navigation-button-next,.webgl-viewer-navigation-button-prev{display:none!important;opacity:0!important;pointer-events:none!important;}' }); }catch{}
     await page.mouse.move(0,0);
@@ -144,35 +207,42 @@ async function main(){
     }
     if(!f0) throw new Error('Não foi possível capturar um quadro inicial não vazio');
     console.log('F0 hash '+hash(f0)+' bytes '+f0.length);
-    const DEADLINE=Date.now()+DEADLINE_MS;
-
-    // --- Navegação para frente: ArrowRight + capturar cada quadro distinto não-branco ---
-    const pages=[{ index:0, data:f0 }];
-    let last=f0, dupStreak=0;
-    for(let p=1;p<MAX_PAGES && Date.now()<DEADLINE;p++){
-      try{ await page.keyboard.press('ArrowRight'); }catch(e){ console.log('FAIL press '+p+': '+e.message.slice(0,80)); break; }
-      const s=await settle();
-      if(!s){ console.log(`  -> null@p${p}`); break; }
-      const blank=isBlank(s);
-      console.log(`p${p}: blank=${blank} hash=${hash(s)} dupStreak=${dupStreak}`);
-      if(blank) continue;
-      if(Buffer.compare(f0,s)===0){ console.log(`  -> f0@p${p}`); break; }
-      if(Buffer.compare(last,s)===0){
-        dupStreak++;
-        if(dupStreak>=NOCHANGE_STREAK_END){ console.log(`END: frozen (no change x${dupStreak}) at frame ${p}`); break; }
-        continue;
-      }
-      dupStreak=0; last=s; pages.push({ index:p, data:s });
-    }
-
-    // --- Escrever PNGs + manifest ---
-    for(const pg of pages) fs.writeFileSync(`${OUTDIR}/${String(pg.index).padStart(3,'0')}.png`, pg.data);
-    const manifest={ url:URL, presentMode:true, navigation:'ArrowRight', pages:pages.map(p=>({ index:p.index, file:`${String(p.index).padStart(3,'0')}.png`, size:Buffer.byteLength(p.data), hash:hash(p.data) })) };
-    fs.writeFileSync(path.join(OUTDIR,'..','manifest.json'), JSON.stringify(manifest,null,2));
-
-    console.log(`CAPTURED ${pages.length} pages -> ${OUTDIR}`);
+    const result = await captureFrames({
+      first: f0, maxPages: MAX_PAGES, deadlineMs: DEADLINE_MS,
+      noChangeStreak: NOCHANGE_STREAK_END, isBlank,
+      isDuplicate: findSimilarFrame,
+      isTerminal: async () => {
+        const nextButton = presentFrame.locator('.webgl-viewer-navigation-button-next');
+        return await nextButton.count() === 1 && !await nextButton.isEnabled();
+      },
+      next: async index => {
+        await page.keyboard.press('ArrowRight');
+        const frame = await settle();
+        const restartControl = presentFrame.getByText(/^(restart|replay|recomeçar|reiniciar)$/i).first();
+        const terminal = await restartControl.count() > 0 && await restartControl.isVisible().catch(() => false);
+        console.log(`FRAME ${index}: ${frame ? hash(frame) : 'empty'}`);
+        if (terminal) console.log('VIEWER terminal control: restart/replay');
+        return { frame, terminal };
+      },
+      save: async (index, data) => {
+        const file = `${String(index).padStart(3, '0')}.png`;
+        fs.writeFileSync(path.join(OUTDIR, file), data);
+        manifest.pages.push({ index, file, size: data.length, hash: hash(data) });
+        writeManifest();
+      },
+    });
+    Object.assign(manifest, result);
+    if (result.completed) manifest.completionEvidence = result.completionEvidence;
+    writeManifest();
+    console.log(`${result.completed ? 'COMPLETE' : 'INCOMPLETE'}: ${result.stopReason}; ${manifest.pages.length} pages -> ${OUTDIR}`);
+    if (!result.completed) process.exitCode = 2;
+  } catch (error) {
+    manifest.completed = false;
+    manifest.stopReason = 'capture-error';
+    writeManifest();
+    throw error;
   } finally {
-    await browser.close();
+    await browser?.close();
   }
 }
 

@@ -44,6 +44,8 @@ Faça trabalho independente enquanto o job roda. Quando depender do resultado, u
 
 Essa é uma chamada a `job_output`, não a Bash. `waitExpired` com estado `running` ou `stopping` significa apenas que a espera terminou; não reinicie nem mate o job por isso. Use notificações quando disponíveis. Para acompanhamento detalhado e verificação final, carregue a skill `acompanhamento`, disponível no mesmo catálogo DSH.
 
+Não substitua essa espera por Bash com `sleep`, nem por um loop de `sleep` e leitura de log. A espera consome o timeout do Bash; `sleep 60` em uma chamada com limite de 60000 ms pode ativar diagnóstico mesmo com o job saudável. Preserve stdout/stderr no job para o observador devolver progresso.
+
 ## Se já ocorreu timeout
 
 Leia o resultado do executor: duração, sinal, código de saída, job associado e confirmação de encerramento, quando disponível. Um timeout não desfaz arquivos escritos e não prova, sozinho, que todos os processos filhos terminaram. Preserve saídas parciais e verifique efeitos antes de uma repetição.
