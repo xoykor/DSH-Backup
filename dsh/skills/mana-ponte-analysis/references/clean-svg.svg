@@ -1,0 +1,63 @@
+<!-- Clean rack and NAS diagram SVG based on standard network equipment visualization patterns -->
+<!-- Dimensions: 800x500 viewBox for clear readability -->
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <!-- Rack frame (light gray, representing server rack) -->
+  <rect x="10" y="30" width="780" height="440" fill="#f4f4f4" stroke="#ddd" stroke-width="2"/>
+  
+  <!-- Equipment rows in rack (server/switch racks) -->
+  <g id="rack-equipment">
+    <!-- Server rows -->
+    <rect x="20" y="50" width="740" height="40" fill="#f0f4f8" stroke="#999" stroke-width="1"/>
+    <text x="20" y="90" font-family="Arial, sans-serif" font-size="9" text-anchor="middle">Server Row 1</text>
+    
+    <rect x="20" y="110" width="740" height="40" fill="#f0f4f8" stroke="#999" stroke-width="1"/>
+    <text x="20" y="150" font-family="Arial, sans-serif" font-size="9" text-anchor="middle">Server Row 2</text>
+    
+    <!-- Network switch row -->
+    <rect x="20" y="180" width="740" height="40" fill="#e6f7ff" stroke="#007bff" stroke-width="1"/>
+    <text x="20" y="220" font-family="Arial, sans-serif" font-size="9" text-anchor="middle">Network Switch</text>
+    
+    <!-- Storage/NAS row -->
+    <rect x="20" y="260" width="740" height="40" fill="#e6ffe6" stroke="#28a745" stroke-width="1"/>
+    <text x="20" y="300" font-family="Arial, sans-serif" font-size="9" text-anchor="middle">NAS Device</text>
+  </g>
+  
+  <!-- NAS device positioned to the right of rack (as separate storage unit) -->
+  <g id="nas-device" transform="translate(780,150)">
+    <!-- Cylindrical/rectangular storage housing -->
+    <rect x="-40" y="-30" width="80" height="60" rx="10" fill="#e6ffe6"/>
+    <!-- Power indicator LED (top right) -->
+    <circle cx="0" cy="-15" r="5" fill="#ffcc00"/>
+    <!-- Network port indicators (simple rectangles along one side) -->
+    <rect x="-35" y="-55" width="10" height="12" rx="3" fill="#007bff"/>
+    <rect x="-15" y="-55" width="10" height="12" rx="3" fill="#007bff"/>
+    <!-- Small label -->
+    <text x="0" y="-70" font-family="Arial, sans-serif" font-size="7" text-anchor="middle">NAS</text>
+    
+    <!-- Optional: additional small indicator lights -->
+    <circle cx="-8" cy="-35" r="4" fill="#ffcc00"/>
+    <circle cx="12" cy="-35" r="4" fill="#ffcc00"/>
+  </g>
+  
+  <!-- Legend (bottom left) -->
+  <g id="legend" transform="translate(20,480)">
+    <rect x="0" y="0" width="60" height="30" fill="#e6f7ff"/>
+    <text x="10" y="18" font-family="Arial, sans-serif" font-size="8">Network Switches</text>
+    
+    <rect x="70" y="0" width="60" height="30" fill="#e6ffe6"/>
+    <text x="90" y="18" font-family="Arial, sans-serif" font-size="8">NAS / Storage</text>
+    
+    <rect x="150" y="0" width="60" height="30" fill="#f0f4f8"/>
+    <text x="170" y="18" font-family="Arial, sans-serif" font-size="8">Server Racks</text>
+  </g>
+  
+  <!-- Title -->
+  <text x="400" y="470" font-family="Arial, sans-serif" font-size="11" text-anchor="middle">Internet Rack and NAS Layout</text>
+</svg>
+
+<!-- Note: This SVG is designed to be clean, professional, and readable. -->
+<!-- It uses standard color conventions from network diagrams: -->
+<!--   - Light gray (#f4f4f4): rack frame/background -->
+<!--   - Blue (#e6f7ff): network switches -->
+<!--   - Green (#e6ffe6): NAS storage device -->
+<!--   - Light blue (#f0f4f8): server racks -->

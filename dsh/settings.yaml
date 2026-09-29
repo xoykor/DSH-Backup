@@ -47,15 +47,17 @@ llm-pi-ai:
           input:
             - text
             - image
+        - id: granite-4.2-3b
+          name: granite-4.2-3b
 agent-default-model:
   provider: lmstudio
-  model: ornith-dsh@q5_k_m
+  model: granite-4.2-3b
 permission:
   defaultPreset: danger-full-access
 dsh-context-guard:
   presets:
     local-robust-9b:
-      contextWindow: 64000
+      contextWindow: 131072
       economyRatio: 0.5
       checkpointRatio: 0.625
       compactRatio: 0.7715
