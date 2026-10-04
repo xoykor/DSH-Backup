@@ -5,13 +5,3 @@
   config:
     adoptSkills:
       - '*'
-- insert:
-    - id: mcp-client-rag
-      name: '@deepseek-ai/dsh-mcp-client'
-      config:
-        serverName: rag
-        transport: stdio
-        command: npm
-        args: ['run', 'mcp:stdio']
-        env: {}
-        cwd: __HOME__/projects/rag-v2

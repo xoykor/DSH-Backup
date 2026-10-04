@@ -32,26 +32,31 @@ llm-pi-ai:
       timeoutMs: 2147483647
       streamIdleTimeoutMs: 2147483647
       models:
-        - id: ornith-1.5-9b
-          maxTokens: 24576
+        - id: ornith-1.5-9b-dsh-agentic-gpt-5.6-sol-distill
+          name: ornith-1.5-9b-dsh-agentic-gpt-5.6-sol-distill
           input:
             - text
             - image
+          # This model's LM Studio chat template has no reasoning_effort input;
+          # it always starts a thinking block unless LM Studio changes its template.
+          reasoningEfforts: false
+        - id: qwen3.8-27b-gsq-rco
+          name: qwen3.8-27b-gsq-rco
+          # Its template accepts exactly low, medium, and xhigh. Expose the
+          # familiar UI level "high" while sending the template's xhigh value.
           reasoningEfforts:
-            off: none
+            low: low
+            medium: medium
             high: xhigh
-        - id: gemma-4-12b-agentic-fable5-composer2.5-v2-3.5x-tau2@q4_k_m
-          name: gemma-4-12b-agentic-fable5-composer2.5-v2-3.5x-tau2@q4_k_m
-        - id: ornith-dsh@q5_k_m
-          name: ornith-dsh@q5_k_m
-          input:
-            - text
-            - image
         - id: granite-4.2-3b
           name: granite-4.2-3b
+          # Granite's LM Studio template toggles between low and full reasoning.
+          reasoningEfforts:
+            low: low
+            high: high
 agent-default-model:
   provider: lmstudio
-  model: granite-4.2-3b
+  model: ornith-1.5-9b-dsh-agentic-gpt-5.6-sol-distill
 permission:
   defaultPreset: danger-full-access
 dsh-context-guard:

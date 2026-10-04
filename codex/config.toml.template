@@ -1,5 +1,5 @@
 model = "gpt-6-luna"
-model_reasoning_effort = "xhigh"
+model_reasoning_effort = "high"
 service_tier = "default"
 [projects."__HOME__"]
 trust_level = "trusted"
@@ -268,6 +268,54 @@ trust_level = "trusted"
 [projects."__HOME__/Documents/Codex/2026-09-29/tem-alguma-coisa-no-sistema-pra"]
 trust_level = "trusted"
 
+[projects."__HOME__/Documents/Codex/2026-09-29/error-game-components-inventorycomponent-ws-1464"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-30/tem-como-no-gpt-harness-fazer"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-30/cr"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-30/cr-2"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-30/s"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-09-30/https-github-com-ubden-creamapi-creaminstaller"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-10-01/c"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-10-01/ger"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-10-01/ta"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-10-01/car"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-10-01/q"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-10-01/a"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-10-01/new-chat"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-10-02/min"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-10-03/https-www-youtube-com-playlist-list"]
+trust_level = "trusted"
+
+[projects."__HOME__/Documents/Codex/2026-10-03/q"]
+trust_level = "trusted"
+
 [desktop]
 followUpQueueMode = "steer"
 conversationDetailMode = "STEPS_COMMANDS"
@@ -318,6 +366,9 @@ enabled = true
 [plugins."conversation-api-cost@personal"]
 enabled = true
 
+[plugins."code-review@openai-bundled"]
+enabled = true
+
 [mcp_servers.node_repl]
 args = []
 command = "/usr/lib/chatgpt/resources/cua_node/bin/node_repl"
@@ -329,13 +380,13 @@ NODE_REPL_NODE_MODULE_DIRS = "/usr/lib/chatgpt/resources/cua_node/lib/node_modul
 NODE_REPL_NODE_PATH = "/usr/lib/chatgpt/resources/cua_node/bin/node"
 NODE_REPL_TRUSTED_CODE_PATHS = "__CODEX_HOME__:/usr/lib/chatgpt/resources/cua_node/lib/node_modules"
 CODEX_HOME = "__CODEX_HOME__"
-BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab"
+BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab,mcpapps"
 BROWSER_USE_TINYSKY_ENABLED = "1"
 NODE_REPL_INSTRUCTIONS_USE_CASE_BROWSER = ""
 NODE_REPL_INSTRUCTIONS_USE_CASE_CHROME = ""
 BROWSER_USE_CODEX_APP_BUILD_FLAVOR = "prod"
-BROWSER_USE_CODEX_APP_VERSION = "26.917.62051"
-NODE_REPL_TRUSTED_SERVICES = '{"browser":"__CODEX_HOME__/plugins/cache/openai-bundled/browser/26.917.62051/scripts/browser-service.mjs"}'
+BROWSER_USE_CODEX_APP_VERSION = "26.930.21537"
+NODE_REPL_TRUSTED_SERVICES = '{"browser":"__CODEX_HOME__/plugins/cache/openai-bundled/browser/26.930.21537/scripts/browser-service.mjs"}'
 CODEX_CLI_PATH = "/usr/lib/chatgpt/resources/codex"
 
 [tui.model_availability_nux]
