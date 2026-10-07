@@ -25,9 +25,13 @@ llm-pi-ai:
       # DSH, while its Chat Completions wrapper rejects image/webp.
       api: openai-responses
       baseURL: http://127.0.0.1:1234/v1
-      # Raised to the model's own cap (ornith). The backend's real window is
-      # still controlled by LM Studio; this only sets DSH's assumed size.
-      defaultContextWindow: 131072
+      # pi-ai resolves ornith's context window from here (entry has no explicit
+      # contextWindow and the model is not in pi-ai's built-in catalog, so this
+      # becomes request.defaultContextWindow at lib/index.js:671). It must match
+      # LM Studio's UI value (262144) — a smaller number makes pi-ai flag silent
+      # overflow (Case 2 of isContextOverflow) at ~50% of the real window, which
+      # surfaces as CONTEXT_WINDOW_EXCEEDED on otherwise successful turns.
+      defaultContextWindow: 262144
       # Unlimited timeout / connection watchdog for local reasoning
       timeoutMs: 2147483647
       streamIdleTimeoutMs: 2147483647
