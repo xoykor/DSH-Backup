@@ -37,23 +37,14 @@ llm-pi-ai:
           input:
             - text
             - image
-          # This model's LM Studio chat template has no reasoning_effort input;
-          # it always starts a thinking block unless LM Studio changes its template.
           reasoningEfforts: false
-        - id: qwen3.8-27b-gsq-rco
-          name: qwen3.8-27b-gsq-rco
-          # Its template accepts exactly low, medium, and xhigh. Expose the
-          # familiar UI level "high" while sending the template's xhigh value.
-          reasoningEfforts:
-            low: low
-            medium: medium
-            high: xhigh
         - id: granite-4.2-3b
           name: granite-4.2-3b
-          # Granite's LM Studio template toggles between low and full reasoning.
           reasoningEfforts:
             low: low
             high: high
+        - id: swift-1.5-qwen3.8-27b-gsq-rco
+          name: swift-1.5-qwen3.8-27b-gsq-rco
 agent-default-model:
   provider: lmstudio
   model: ornith-1.5-9b-dsh-agentic-gpt-5.6-sol-distill
@@ -62,12 +53,12 @@ permission:
 dsh-context-guard:
   presets:
     local-robust-9b:
-      contextWindow: 131072
+      contextWindow: 262144
       economyRatio: 0.5
       checkpointRatio: 0.625
-      compactRatio: 0.7715
+      compactRatio: 0.699
       responseRatio: 0.1875
-      summaryRatio: 0.01
-      summaryMinRatio: 0.001
+      summaryRatio: 0.08250000000000005
+      summaryMinRatio: 0.022
       safetyRatio: 0.021
       retainRatio: 0.245

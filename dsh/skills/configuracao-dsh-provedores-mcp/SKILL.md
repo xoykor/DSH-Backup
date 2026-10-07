@@ -1,12 +1,6 @@
 ---
 name: "configuracao-dsh-provedores-mcp"
-description: "Configure LLM model providers and external stdio MCP servers in the DeepSeek Harness (dsh) via its file-based patch mechanism, then verify when tools become callable. Covers the @deepseek-ai/dsh-mcp-client insert: entry, per-profile cordis.patch.yml wiring, lmstudio/llm-pi-ai provider config, async MCP discovery timing, and the headless vs web-host verification gap.\\n\\nConfigurar provedores de LLM e servidores MCP externos (stdio) no DeepSeek Harness (dsh) pelo mecanismo de patch por arquivo, depois verificar quando as ferramentas ficam invocáveis. Cobre a entrada insert: do @deepseek-ai/dsh-mcp-client, o wiring em cordis.patch.yml por perfil, a config do provedor lmstudio/llm-pi-ai, o timing assíncrono da descoberta MCP e a diferença de verificação entre headless e sessão web-host."
-author: "dsh-skill-curator"
-version: "1.0.0"
-created: "2026-08-09"
----
-name: "configuracao-dsh-provedores-mcp"
-description: "Configure LLM model providers and external stdio MCP servers in the DeepSeek Harness (dsh) via its file-based patch mechanism, then verify when tools become callable. Covers the @deepseek-ai/dsh-mcp-client insert: entry, per-profile cordis.patch.yml wiring, lmstudio/llm-pi-ai provider config, async MCP discovery timing, and the headless vs web-host verification gap.\n\nConfigurar provedores de LLM e servidores MCP externos (stdio) no DeepSeek Harness (dsh) pelo mecanismo de patch por arquivo, depois verificar quando as ferramentas ficam invocáveis. Cobre a entrada insert: do @deepseek-ai/dsh-mcp-client, o wiring em cordis.patch.yml por perfil, a config do provedor lmstudio/llm-pi-ai, o timing assíncrono da descoberta MCP e a diferença de verificação entre headless e sessão web-host."
+description: "Configure LLM model providers and external stdio MCP servers in the DeepSeek Harness (dsh) via its file-based patch mechanism, then verify when tools become callable. Covers the @deepseek-ai/dsh-mcp-client insert: entry, per-profile cordis.patch.yml wiring, lmstudio/llm-pi-ai provider config, async MCP discovery timing, and the headless vs web-host verification gap.\\\\n\\\\nConfigurar provedores de LLM e servidores MCP externos (stdio) no DeepSeek Harness (dsh) pelo mecanismo de patch por arquivo, depois verificar quando as ferramentas ficam invocáveis. Cobre a entrada insert: do @deepseek-ai/dsh-mcp-client, o wiring em cordis.patch.yml por perfil, a config do provedor lmstudio/llm-pi-ai, o timing assíncrono da descoberta MCP e a diferença de verificação entre headless e sessão web-host."
 author: "dsh-skill-curator"
 version: "1.0.0"
 created: "2026-08-09"
@@ -78,6 +72,13 @@ do runtime instalado (`__HOME__/.local/lib/dsh-runtime-*/node_modules/@deepseek-
 
 Ler antes de inventar o formato; não confiar em blocos `- id:` ilustrativos de handoffs.
 
+## Receita verificada nesta sessão (repo RAG + servidor stdio)
+
+- **Clone**: `git clone https://github.com/AcidicSoil/rag-v2` em `~/projects`. O espelho público que funciona é **AcidicSoil/rag-v2** — o `dirty-data/rag-v2` do Hub clona mal.
+- **Instalar** (workspace pnpm/npm; o MCP depende de `@rag-v2/core` e `@rag-v2/lmstudio-shared`): `npm install` no repo → ~170 pacotes.
+- **Rodar servidor stdio**: `cd ~/projects/rag-v2 && npm run mcp:stdio`. Sai com exit 0 apenas porque o timeout matou o processo (o servidor espera no stdin por design); saída limpa sem erros de embedding no boot.
+- **Modelos no LM Studio** já presentes após reboot: `ornith-1.5-9b-dsh-agentic-gpt-5.6-sol-distill` (LLM) + 2 embeddings (`text-embedding-qwen3-embedding-0.6b`, `text-embedding-nomic-embed-text-v1.5`).
+
 ## Pitfalls confirmados
 
 1. **Perfil errado**: a entrada vive em `profiles/web/cordis.patch.yml`. Bootar outro
@@ -89,9 +90,7 @@ Ler antes de inventar o formato; não confiar em blocos `- id:` ilustrativos de 
    falha com `EADDRINUSE address already in use 127.0.0.1:3080`. O host que segura 3080
    é o que hospeda este chat — não iniciar uma segunda instância web (um reboot do PC
    não libera a porta; o processo já está vivo).
-4. **Não confiar em nomes ilustrativos do handoff**: pacotes/repos/nomes exatos podem
-   variar; confirmar cada URL e nome de pacote na execução (ex.: `dirty-data/rag-v2` no
-   Hub clona mal; espelho público é outro repo).
+4. **Não confiar em nomes ilustrativos do handoff**: pacotes/repos/nomes exatos podem variar; confirmar cada URL e nome de pacote na execução (ex.: `dirty-data/rag-v2` no Hub clona mal — o espelho público que funciona é **AcidicSoil/rag-v2**; instale a workspace com `npm install` e rode o servidor stdio via `npm run mcp:stdio`, que executa `@rag-v2/mcp-server` → `npx -y tsx src/stdioServer.ts`). O servidor já foi confirmado iniciando limpo (espera no stdin por design; exit 0 só porque um timeout matou o processo).
 
 ## Fluxo de verificação ao vivo (nova sessão web)
 
@@ -109,3 +108,7 @@ Se aparecer **Error**, rodar manualmente no terminal para ver o erro real:
 
 Ver `references/dsh-mcp-provider-notes.md` — recipe de configuração, snippet completo,
 registro do erro e passos de verificação.
+
+## Lição de verificação desta sessão
+
+A única prova *ao vivo* de tool-calling é uma **nova** sessão web-host interativa após boot — headless aborta com `cannot get property "agentPresets" without inject`. Config composta + backend vivo + servidor stdio rodando = tudo pronto; falta só o discovery assíncrono concluir numa conversa nova.
